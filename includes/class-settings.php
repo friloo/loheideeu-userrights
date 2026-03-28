@@ -134,16 +134,25 @@ class WP_UserRights_Settings {
 		$is_builtin    = in_array( $selected_role, $builtin_roles, true );
 		?>
 		<div class="wrap wp-userrights-wrap">
-			<h1><?php esc_html_e( 'Benutzerrechte', 'wp-userrights' ); ?></h1>
-			<p class="description">
-				<?php esc_html_e( 'Wählen Sie eine Rolle und legen Sie fest, welche Backend-Menüpunkte diese Rolle sehen darf. Administratoren sehen immer alles.', 'wp-userrights' ); ?>
-			</p>
 
-			<?php if ( isset( $_GET['saved'] ) && '1' === $_GET['saved'] ) : ?>
-				<div class="notice notice-success is-dismissible">
-					<p><?php esc_html_e( 'Einstellungen gespeichert.', 'wp-userrights' ); ?></p>
+			<!-- Plugin-Header -->
+			<div class="wp-userrights-plugin-header">
+				<span class="dashicons dashicons-shield wp-userrights-logo"></span>
+				<div class="wp-userrights-header-text">
+					<h1><?php esc_html_e( 'WP User Rights', 'wp-userrights' ); ?></h1>
+					<p>
+						<?php esc_html_e( 'Backend-Zugriffsrechte pro Benutzerrolle', 'wp-userrights' ); ?>
+						&nbsp;·&nbsp;
+						<a href="https://loheide.eu" target="_blank" rel="noopener">loheide.eu</a>
+					</p>
 				</div>
-			<?php endif; ?>
+				<?php if ( isset( $_GET['saved'] ) && '1' === $_GET['saved'] ) : ?>
+				<div class="wp-userrights-save-badge">
+					<span class="dashicons dashicons-yes"></span>
+					<?php esc_html_e( 'Gespeichert', 'wp-userrights' ); ?>
+				</div>
+				<?php endif; ?>
+			</div>
 
 			<?php if ( empty( $roles ) ) : ?>
 				<div class="notice notice-warning">
@@ -153,7 +162,8 @@ class WP_UserRights_Settings {
 
 			<!-- Rollenauswahl -->
 			<div class="wp-userrights-role-selector">
-				<label for="wp-userrights-role-select"><strong><?php esc_html_e( 'Rolle:', 'wp-userrights' ); ?></strong></label>
+				<span class="role-selector-icon dashicons dashicons-groups"></span>
+				<label for="wp-userrights-role-select"><?php esc_html_e( 'Rolle:', 'wp-userrights' ); ?></label>
 				<select id="wp-userrights-role-select">
 					<?php foreach ( $roles as $role_key => $role_data ) : ?>
 						<option value="<?php echo esc_attr( $role_key ); ?>"
@@ -163,6 +173,17 @@ class WP_UserRights_Settings {
 						</option>
 					<?php endforeach; ?>
 				</select>
+				<?php if ( $is_builtin ) : ?>
+				<span class="role-badge role-badge-warning">
+					<span class="dashicons dashicons-warning"></span>
+					<?php esc_html_e( 'Standardrolle', 'wp-userrights' ); ?>
+				</span>
+				<?php else : ?>
+				<span class="role-badge role-badge-custom">
+					<span class="dashicons dashicons-yes-alt"></span>
+					<?php esc_html_e( 'Eigene Rolle', 'wp-userrights' ); ?>
+				</span>
+				<?php endif; ?>
 			</div>
 
 			<?php if ( $is_builtin ) : ?>
@@ -196,17 +217,34 @@ class WP_UserRights_Settings {
 					</h2>
 
 					<div class="wp-userrights-toolbar">
-						<button type="button" class="button" id="wp-userrights-check-all">
-							<?php esc_html_e( 'Alle auswählen', 'wp-userrights' ); ?>
-						</button>
-						<button type="button" class="button" id="wp-userrights-uncheck-all">
-							<?php esc_html_e( 'Alle abwählen', 'wp-userrights' ); ?>
-						</button>
+						<div class="toolbar-left">
+							<button type="button" class="button wp-userrights-btn-check" id="wp-userrights-check-all">
+								<span class="dashicons dashicons-yes-alt"></span>
+								<?php esc_html_e( 'Alle', 'wp-userrights' ); ?>
+							</button>
+							<button type="button" class="button wp-userrights-btn-uncheck" id="wp-userrights-uncheck-all">
+								<span class="dashicons dashicons-dismiss"></span>
+								<?php esc_html_e( 'Keine', 'wp-userrights' ); ?>
+							</button>
+							<span id="wp-userrights-count" class="selection-count">
+								<span id="wp-userrights-count-num">0</span>
+								<?php esc_html_e( 'ausgewählt', 'wp-userrights' ); ?>
+							</span>
+						</div>
+						<div class="toolbar-right">
+							<div class="wp-userrights-search-box">
+								<span class="dashicons dashicons-search"></span>
+								<input type="text" id="wp-userrights-search"
+									placeholder="<?php esc_attr_e( 'Menüpunkt suchen …', 'wp-userrights' ); ?>"
+									autocomplete="off">
+							</div>
+						</div>
 					</div>
 
 					<!-- Capability-Vorschau: wird per JavaScript aktualisiert -->
 					<div id="wp-userrights-cap-preview" class="wp-userrights-cap-preview" style="display:none;">
-						<span class="cap-preview-label"><?php esc_html_e( 'Wird vergeben:', 'wp-userrights' ); ?></span>
+						<span class="dashicons dashicons-admin-network cap-preview-icon"></span>
+						<span class="cap-preview-label"><?php esc_html_e( 'WordPress-Capabilities:', 'wp-userrights' ); ?></span>
 						<span id="wp-userrights-cap-list" class="cap-preview-list"></span>
 					</div>
 

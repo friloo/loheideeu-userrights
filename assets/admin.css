@@ -1,178 +1,355 @@
-/* WP User Rights – Admin Styles */
+/* ==========================================================================
+   WP User Rights – Admin Styles
+   Author: Friederich Loheide · loheide.eu
+   ========================================================================== */
 
+:root {
+    --wpur-blue:        #2271b1;
+    --wpur-blue-dark:   #135e96;
+    --wpur-blue-light:  #f0f6fc;
+    --wpur-green:       #00a32a;
+    --wpur-green-light: #edfaef;
+    --wpur-orange:      #d63638;
+    --wpur-warn-bg:     #fff8e5;
+    --wpur-warn-border: #dba617;
+    --wpur-border:      #dcdcde;
+    --wpur-bg:          #f6f7f7;
+    --wpur-white:       #ffffff;
+    --wpur-text:        #1d2327;
+    --wpur-text-muted:  #646970;
+    --wpur-radius:      6px;
+    --wpur-shadow:      0 1px 4px rgba(0,0,0,.08), 0 0 0 1px rgba(0,0,0,.04);
+    --wpur-shadow-hover:0 4px 12px rgba(0,0,0,.12);
+    --wpur-transition:  0.15s ease;
+}
+
+/* Wrapper */
 .wp-userrights-wrap {
-    max-width: 900px;
+    max-width: 940px;
 }
 
-.wp-userrights-wrap h1 {
-    margin-bottom: 5px;
-}
+/* ==========================================================================
+   Plugin Header
+   ========================================================================== */
 
-.wp-userrights-wrap > .description {
-    margin-bottom: 20px;
-    color: #646970;
-}
-
-/* Rollenauswahl */
-.wp-userrights-role-selector {
-    margin: 20px 0;
+.wp-userrights-plugin-header {
     display: flex;
     align-items: center;
-    gap: 10px;
-}
-
-.wp-userrights-role-selector select {
-    min-width: 200px;
-    font-size: 14px;
-}
-
-/* Abschnitte */
-.wp-userrights-section {
-    background: #fff;
-    border: 1px solid #c3c4c7;
-    border-radius: 4px;
-    padding: 20px 24px;
-    margin-bottom: 20px;
-}
-
-.wp-userrights-section h2 {
-    margin-top: 0;
-    padding-bottom: 12px;
-    border-bottom: 1px solid #e0e0e0;
-    font-size: 16px;
-}
-
-/* Toolbar */
-.wp-userrights-toolbar {
-    margin-bottom: 16px;
-    display: flex;
-    gap: 8px;
-}
-
-/* Menü-Baum */
-.wp-userrights-menu-tree {
-    display: flex;
-    flex-direction: column;
-    gap: 2px;
-}
-
-.menu-item-top {
-    border: 1px solid #e0e0e0;
-    border-radius: 3px;
+    gap: 18px;
+    background: linear-gradient(135deg, #1d2327 0%, #2271b1 100%);
+    color: #fff;
+    padding: 20px 28px;
+    border-radius: var(--wpur-radius);
+    margin-bottom: 24px;
+    box-shadow: 0 2px 8px rgba(34, 113, 177, .35);
+    position: relative;
     overflow: hidden;
 }
 
-.menu-item-label {
+.wp-userrights-plugin-header::after {
+    content: '';
+    position: absolute;
+    right: -30px;
+    top: -30px;
+    width: 160px;
+    height: 160px;
+    border-radius: 50%;
+    background: rgba(255,255,255,.05);
+    pointer-events: none;
+}
+
+.wp-userrights-logo {
+    font-size: 40px !important;
+    width: 40px !important;
+    height: 40px !important;
+    opacity: .9;
+    flex-shrink: 0;
+}
+
+.wp-userrights-header-text h1 {
+    margin: 0;
+    padding: 0;
+    color: #fff;
+    font-size: 20px;
+    font-weight: 700;
+    line-height: 1.3;
+    border: none;
+}
+
+.wp-userrights-header-text p {
+    margin: 3px 0 0;
+    color: rgba(255,255,255,.75);
+    font-size: 13px;
+}
+
+.wp-userrights-header-text a {
+    color: rgba(255,255,255,.9);
+    text-decoration: underline;
+    text-underline-offset: 2px;
+}
+
+.wp-userrights-save-badge {
+    margin-left: auto;
     display: flex;
     align-items: center;
-    gap: 8px;
-    padding: 8px 12px;
-    cursor: pointer;
-    transition: background 0.1s;
-    margin: 0;
-    font-weight: normal;
-    line-height: 1.6;
-}
-
-.menu-item-label:hover {
-    background: #f0f6fc;
-}
-
-.menu-item-label.top-level {
-    background: #f6f7f7;
-    font-weight: 600;
-    border-bottom: 1px solid #e0e0e0;
-}
-
-.menu-item-label.top-level:hover {
-    background: #e8f0fe;
-}
-
-/* Letzte Top-Level ohne Kinder: kein border-bottom */
-.menu-item-top:not(:has(.submenu-items)) .menu-item-label.top-level {
-    border-bottom: none;
-}
-
-/* Falls :has() nicht unterstützt wird – JS übernimmt */
-.menu-item-top.no-children .menu-item-label.top-level {
-    border-bottom: none;
-}
-
-.submenu-items {
-    padding: 4px 0;
-    background: #fff;
-}
-
-.menu-item-label.sub-level {
-    padding-left: 36px;
+    gap: 5px;
+    background: rgba(255,255,255,.15);
+    border: 1px solid rgba(255,255,255,.3);
+    color: #fff;
+    padding: 5px 12px;
+    border-radius: 20px;
     font-size: 13px;
-    color: #3c434a;
+    font-weight: 500;
+    animation: wpur-pop .3s ease;
 }
 
-.menu-item-label.sub-level:hover {
-    background: #f0f6fc;
-}
-
-/* Checkboxen */
-.menu-item-label input[type="checkbox"] {
-    margin: 0;
-    flex-shrink: 0;
-    cursor: pointer;
-}
-
-/* Dashicons in Labels */
-.menu-item-label .dashicons {
+.wp-userrights-save-badge .dashicons {
     font-size: 16px;
     width: 16px;
     height: 16px;
+    color: #7ee787;
+}
+
+@keyframes wpur-pop {
+    from { opacity: 0; transform: scale(.85); }
+    to   { opacity: 1; transform: scale(1); }
+}
+
+/* ==========================================================================
+   Rollenauswahl
+   ========================================================================== */
+
+.wp-userrights-role-selector {
+    display: flex;
+    align-items: center;
+    gap: 10px;
+    background: var(--wpur-white);
+    border: 1px solid var(--wpur-border);
+    border-radius: var(--wpur-radius);
+    padding: 14px 18px;
+    margin-bottom: 20px;
+    box-shadow: var(--wpur-shadow);
+}
+
+.wp-userrights-role-selector .role-selector-icon {
+    font-size: 20px;
+    width: 20px;
+    height: 20px;
+    color: var(--wpur-blue);
     flex-shrink: 0;
-    color: #787c82;
 }
 
-.menu-item-label.top-level .dashicons {
-    color: #50575e;
-}
-
-/* Slug-Hinweis */
-.slug-hint {
-    margin-left: auto;
-    font-size: 11px;
-    color: #a0a5aa;
-    background: transparent;
-    padding: 0;
-    border: none;
-    font-family: monospace;
-    max-width: 240px;
-    overflow: hidden;
-    text-overflow: ellipsis;
+.wp-userrights-role-selector label {
+    font-weight: 600;
+    color: var(--wpur-text);
     white-space: nowrap;
 }
 
-/* Checked-Zustand hervorheben */
-.menu-item-label:has(input:checked) {
-    background: #edf7ed;
+.wp-userrights-role-selector select {
+    font-size: 14px;
+    padding: 5px 10px;
+    border: 1px solid var(--wpur-border);
+    border-radius: 4px;
+    min-width: 200px;
+    cursor: pointer;
+    transition: border-color var(--wpur-transition);
 }
 
-.menu-item-label.top-level:has(input:checked) {
-    background: #d8f0d8;
+.wp-userrights-role-selector select:focus {
+    border-color: var(--wpur-blue);
+    outline: 2px solid rgba(34,113,177,.25);
 }
 
-/* Capability-Vorschau */
+.role-badge {
+    display: inline-flex;
+    align-items: center;
+    gap: 4px;
+    padding: 3px 10px;
+    border-radius: 20px;
+    font-size: 12px;
+    font-weight: 500;
+}
+
+.role-badge .dashicons {
+    font-size: 14px;
+    width: 14px;
+    height: 14px;
+}
+
+.role-badge-custom {
+    background: var(--wpur-green-light);
+    color: var(--wpur-green);
+    border: 1px solid #b8e8c4;
+}
+
+.role-badge-warning {
+    background: var(--wpur-warn-bg);
+    color: #996800;
+    border: 1px solid var(--wpur-warn-border);
+}
+
+/* Standard-Rollen Warnung */
+.notice.inline {
+    margin: 0 0 20px;
+}
+
+/* ==========================================================================
+   Abschnitte (Cards)
+   ========================================================================== */
+
+.wp-userrights-section {
+    background: var(--wpur-white);
+    border: 1px solid var(--wpur-border);
+    border-radius: var(--wpur-radius);
+    padding: 22px 24px;
+    margin-bottom: 20px;
+    box-shadow: var(--wpur-shadow);
+}
+
+.wp-userrights-section h2 {
+    margin: 0 0 16px;
+    padding-bottom: 14px;
+    border-bottom: 1px solid var(--wpur-border);
+    font-size: 15px;
+    font-weight: 600;
+    color: var(--wpur-text);
+    display: flex;
+    align-items: center;
+    gap: 8px;
+}
+
+/* ==========================================================================
+   Toolbar
+   ========================================================================== */
+
+.wp-userrights-toolbar {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    gap: 12px;
+    margin-bottom: 14px;
+    flex-wrap: wrap;
+}
+
+.toolbar-left,
+.toolbar-right {
+    display: flex;
+    align-items: center;
+    gap: 8px;
+}
+
+/* Toolbar-Buttons */
+.wp-userrights-btn-check,
+.wp-userrights-btn-uncheck {
+    display: inline-flex !important;
+    align-items: center;
+    gap: 5px;
+    padding: 5px 12px !important;
+    border-radius: 4px !important;
+    font-size: 13px !important;
+    transition: background var(--wpur-transition), border-color var(--wpur-transition) !important;
+}
+
+.wp-userrights-btn-check .dashicons,
+.wp-userrights-btn-uncheck .dashicons {
+    font-size: 16px;
+    width: 16px;
+    height: 16px;
+}
+
+.wp-userrights-btn-check:hover {
+    background: var(--wpur-blue-light) !important;
+    border-color: var(--wpur-blue) !important;
+    color: var(--wpur-blue) !important;
+}
+
+.wp-userrights-btn-uncheck:hover {
+    background: #fef0f0 !important;
+    border-color: #c9353b !important;
+    color: #c9353b !important;
+}
+
+/* Zähler */
+.selection-count {
+    font-size: 13px;
+    color: var(--wpur-text-muted);
+    padding: 4px 10px;
+    background: var(--wpur-bg);
+    border: 1px solid var(--wpur-border);
+    border-radius: 20px;
+    white-space: nowrap;
+}
+
+#wp-userrights-count-num {
+    font-weight: 700;
+    color: var(--wpur-blue);
+}
+
+/* Suchfeld */
+.wp-userrights-search-box {
+    position: relative;
+    display: flex;
+    align-items: center;
+}
+
+.wp-userrights-search-box .dashicons {
+    position: absolute;
+    left: 9px;
+    font-size: 16px;
+    width: 16px;
+    height: 16px;
+    color: var(--wpur-text-muted);
+    pointer-events: none;
+}
+
+#wp-userrights-search {
+    padding: 5px 10px 5px 32px !important;
+    border: 1px solid var(--wpur-border);
+    border-radius: 4px;
+    font-size: 13px;
+    width: 220px;
+    transition: border-color var(--wpur-transition), width var(--wpur-transition);
+}
+
+#wp-userrights-search:focus {
+    border-color: var(--wpur-blue);
+    outline: 2px solid rgba(34,113,177,.2);
+    width: 260px;
+}
+
+/* ==========================================================================
+   Capability-Vorschau
+   ========================================================================== */
+
 .wp-userrights-cap-preview {
-    margin: 12px 0 4px;
+    margin: 0 0 14px;
     padding: 10px 14px;
-    background: #f0f6fc;
+    background: var(--wpur-blue-light);
     border: 1px solid #c5d9ed;
-    border-radius: 3px;
+    border-radius: 4px;
     display: flex;
     align-items: center;
     flex-wrap: wrap;
-    gap: 6px;
+    gap: 8px;
     font-size: 13px;
+    animation: wpur-fadein .2s ease;
+}
+
+@keyframes wpur-fadein {
+    from { opacity: 0; transform: translateY(-4px); }
+    to   { opacity: 1; transform: translateY(0); }
+}
+
+.cap-preview-icon {
+    font-size: 16px !important;
+    width: 16px !important;
+    height: 16px !important;
+    color: var(--wpur-blue);
+    flex-shrink: 0;
 }
 
 .cap-preview-label {
-    color: #2271b1;
+    color: var(--wpur-blue-dark);
     font-weight: 600;
     flex-shrink: 0;
 }
@@ -180,25 +357,242 @@
 .cap-preview-list {
     display: flex;
     flex-wrap: wrap;
-    gap: 4px;
+    gap: 5px;
 }
 
 .cap-badge {
-    display: inline-block;
-    padding: 2px 8px;
-    background: #2271b1;
+    display: inline-flex;
+    align-items: center;
+    padding: 2px 9px;
+    background: var(--wpur-blue);
     color: #fff;
     border-radius: 3px;
     font-size: 12px;
-    font-family: monospace;
+    font-family: ui-monospace, "Cascadia Mono", "Segoe UI Mono", monospace;
     border: none;
+    letter-spacing: .02em;
 }
 
-/* Formular-Abschnitt */
-.wp-userrights-form .form-table th {
-    width: 220px;
+/* ==========================================================================
+   Menü-Baum
+   ========================================================================== */
+
+.wp-userrights-menu-tree {
+    display: flex;
+    flex-direction: column;
+    gap: 4px;
 }
+
+/* Versteckte Suchergebnisse */
+.menu-item-top.wpur-hidden {
+    display: none;
+}
+
+.wpur-no-results {
+    padding: 20px;
+    text-align: center;
+    color: var(--wpur-text-muted);
+    font-style: italic;
+}
+
+.menu-item-top {
+    border: 1px solid var(--wpur-border);
+    border-radius: 5px;
+    overflow: hidden;
+    transition: box-shadow var(--wpur-transition), border-color var(--wpur-transition);
+}
+
+.menu-item-top:hover {
+    border-color: #b5bcc2;
+    box-shadow: var(--wpur-shadow);
+}
+
+/* Top-Level-Label */
+.menu-item-label {
+    display: flex;
+    align-items: center;
+    gap: 9px;
+    padding: 9px 14px;
+    cursor: pointer;
+    transition: background var(--wpur-transition);
+    margin: 0;
+    font-weight: normal;
+    line-height: 1.6;
+    user-select: none;
+}
+
+.menu-item-label.top-level {
+    background: var(--wpur-bg);
+    font-weight: 600;
+    font-size: 13.5px;
+    color: var(--wpur-text);
+    border-bottom: 1px solid var(--wpur-border);
+}
+
+.menu-item-top.no-children .menu-item-label.top-level {
+    border-bottom: none;
+}
+
+.menu-item-label.top-level:hover {
+    background: #edf3fb;
+}
+
+/* Submenü-Label */
+.submenu-items {
+    padding: 3px 0;
+    background: var(--wpur-white);
+}
+
+.menu-item-label.sub-level {
+    padding-left: 42px;
+    font-size: 13px;
+    color: #3c434a;
+}
+
+.menu-item-label.sub-level:hover {
+    background: #f7fafd;
+}
+
+/* Custom Checkboxen */
+.menu-item-label input[type="checkbox"] {
+    appearance: none;
+    -webkit-appearance: none;
+    width: 16px;
+    height: 16px;
+    border: 2px solid #8c8f94;
+    border-radius: 3px;
+    background: #fff;
+    flex-shrink: 0;
+    cursor: pointer;
+    position: relative;
+    transition: background var(--wpur-transition), border-color var(--wpur-transition);
+}
+
+.menu-item-label input[type="checkbox"]:checked {
+    background: var(--wpur-blue);
+    border-color: var(--wpur-blue);
+}
+
+.menu-item-label input[type="checkbox"]:checked::after {
+    content: '';
+    display: block;
+    position: absolute;
+    left: 3px;
+    top: 0px;
+    width: 5px;
+    height: 9px;
+    border: 2px solid #fff;
+    border-top: none;
+    border-left: none;
+    transform: rotate(45deg);
+}
+
+.menu-item-label input[type="checkbox"]:indeterminate {
+    background: var(--wpur-blue);
+    border-color: var(--wpur-blue);
+}
+
+.menu-item-label input[type="checkbox"]:indeterminate::after {
+    content: '';
+    display: block;
+    position: absolute;
+    left: 2px;
+    top: 5px;
+    width: 8px;
+    height: 2px;
+    background: #fff;
+    border-radius: 1px;
+}
+
+.menu-item-label input[type="checkbox"]:focus {
+    outline: 2px solid rgba(34,113,177,.4);
+    outline-offset: 1px;
+}
+
+/* Dashicons */
+.menu-item-label .dashicons {
+    font-size: 15px;
+    width: 15px;
+    height: 15px;
+    flex-shrink: 0;
+    color: #9ea3a8;
+}
+
+.menu-item-label.top-level .dashicons {
+    color: #646970;
+}
+
+/* Slug-Hinweis */
+.slug-hint {
+    margin-left: auto;
+    font-size: 11px;
+    color: #b5bcc2;
+    background: transparent;
+    padding: 0;
+    border: none;
+    font-family: ui-monospace, monospace;
+    max-width: 220px;
+    overflow: hidden;
+    text-overflow: ellipsis;
+    white-space: nowrap;
+}
+
+/* Gecheckte Einträge hervorheben */
+.menu-item-label:has(input:checked) {
+    background: var(--wpur-green-light);
+}
+
+.menu-item-label:has(input:checked) .slug-hint {
+    color: #5aab68;
+}
+
+.menu-item-label.top-level:has(input:checked) {
+    background: #d8f0d8;
+    border-bottom-color: #b8e8c4;
+}
+
+/* Suchergebnis-Hervorhebung */
+.wpur-highlight {
+    background: #fff3cd;
+    border-radius: 2px;
+    padding: 0 1px;
+}
+
+/* ==========================================================================
+   Inhaltsfilter-Tabelle
+   ========================================================================== */
+
+.wp-userrights-form .form-table th {
+    width: 230px;
+    font-weight: 600;
+}
+
+.wp-userrights-form .form-table td .description {
+    color: var(--wpur-text-muted);
+    font-size: 12px;
+    margin-top: 5px;
+}
+
+/* ==========================================================================
+   Speichern-Button
+   ========================================================================== */
 
 .wp-userrights-form .submit {
     padding-left: 0;
+    margin-top: 4px;
+}
+
+.wp-userrights-form .button-primary {
+    display: inline-flex;
+    align-items: center;
+    gap: 6px;
+    padding: 7px 20px !important;
+    font-size: 14px !important;
+    border-radius: 4px !important;
+    height: auto !important;
+    transition: box-shadow var(--wpur-transition) !important;
+}
+
+.wp-userrights-form .button-primary:hover {
+    box-shadow: 0 2px 8px rgba(34,113,177,.4) !important;
 }
