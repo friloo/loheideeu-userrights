@@ -1,6 +1,7 @@
 <?php
 /**
- * Inhaltsfilter: Schränkt Admin-Listen für Beiträge und Seiten per pre_get_posts ein.
+ * Inhaltsfilter: Schränkt Admin-Listen und REST API für Beiträge/Seiten ein.
+ * Gilt für klassische Admin-Listenansichten und den Gutenberg/REST-API-Kontext.
  */
 
 if ( ! defined( 'ABSPATH' ) ) {
@@ -10,72 +11,84 @@ if ( ! defined( 'ABSPATH' ) ) {
 class WP_UserRights_Content_Filter {
 
 	public function __construct() {
+		// Klassische Admin-Listenansicht
 		add_action( 'pre_get_posts', array( $this, 'filter_content' ) );
 	}
 
 	public function filter_content( $query ) {
-		// Nur im Admin-Bereich
-		if ( ! is_admin() ) {
+		$is_rest = defined( 'REST_REQUEST' ) && REST_REQUEST;
+
+		// Nur im Admin-Bereich oder bei REST-API-Anfragen anwenden
+		if ( ! is_admin() && ! $is_rest ) {
 			return;
 		}
 
-		// Nur Haupt-Query der Admin-Liste
+		// Nur Haupt-Query
 		if ( ! $query->is_main_query() ) {
 			return;
 		}
 
 		$user = wp_get_current_user();
 
-		// Admins nicht einschränken
-		if ( in_array( 'administrator', (array) $user->roles, true ) ) {
+		if ( ! $user->exists() || in_array( 'administrator', (array) $user->roles, true ) ) {
 			return;
 		}
 
 		$permissions = get_option( WP_USERRIGHTS_OPTION, array() );
-		$role        = ! empty( $user->roles ) ? reset( $user->roles ) : '';
-		$role_perms  = isset( $permissions[ $role ] ) ? $permissions[ $role ] : array();
 
-		$post_type = $query->get( 'post_type' );
+		// Multi-Rollen-Union: Sammle erlaubte Kategorien und Seiten über alle Rollen des Users.
+		// Logik: Nur einschränken wenn ALLE Rollen des Users einen Filter konfiguriert haben.
+		// Hat eine Rolle keinen Filter, darf der User alles sehen (Vereinigung = unbegrenzt).
+		$allowed_cats          = array();
+		$allowed_pages         = array();
+		$all_have_cat_filter   = true;
+		$all_have_page_filter  = true;
 
-		// Beiträge (posts) nach Kategorie filtern
-		if ( 'post' === $post_type || ( empty( $post_type ) && is_admin() ) ) {
-			$allowed_cats = isset( $role_perms['allowed_categories'] ) ? (array) $role_perms['allowed_categories'] : array();
+		foreach ( (array) $user->roles as $role ) {
+			$role_perms = isset( $permissions[ $role ] ) ? $permissions[ $role ] : array();
 
-			if ( ! empty( $allowed_cats ) ) {
-				// tax_query verwenden für exakte Kategorie-Filterung
-				$query->set( 'tax_query', array(
-					array(
-						'taxonomy' => 'category',
-						'field'    => 'slug',
-						'terms'    => $allowed_cats,
-					),
-				) );
+			$role_cats  = isset( $role_perms['allowed_categories'] ) ? (array) $role_perms['allowed_categories'] : array();
+			$role_pages = isset( $role_perms['allowed_page_slugs'] ) ? (array) $role_perms['allowed_page_slugs'] : array();
+
+			if ( empty( $role_cats ) ) {
+				$all_have_cat_filter = false;
+			} else {
+				$allowed_cats = array_unique( array_merge( $allowed_cats, $role_cats ) );
+			}
+
+			if ( empty( $role_pages ) ) {
+				$all_have_page_filter = false;
+			} else {
+				$allowed_pages = array_unique( array_merge( $allowed_pages, $role_pages ) );
 			}
 		}
 
+		$post_type = $query->get( 'post_type' );
+
+		// Beiträge nach Kategorie filtern
+		if ( ( 'post' === $post_type || '' === $post_type ) && $all_have_cat_filter && ! empty( $allowed_cats ) ) {
+			$query->set( 'tax_query', array(
+				array(
+					'taxonomy' => 'category',
+					'field'    => 'slug',
+					'terms'    => $allowed_cats,
+				),
+			) );
+		}
+
 		// Seiten nach Slug filtern
-		if ( 'page' === $post_type ) {
-			$allowed_page_slugs = isset( $role_perms['allowed_page_slugs'] ) ? (array) $role_perms['allowed_page_slugs'] : array();
-
-			if ( ! empty( $allowed_page_slugs ) ) {
-				$page_ids = $this->get_page_ids_by_slugs( $allowed_page_slugs );
-
-				if ( ! empty( $page_ids ) ) {
-					$query->set( 'post__in', $page_ids );
-				} else {
-					// Keine passenden Seiten → nichts anzeigen
-					$query->set( 'post__in', array( 0 ) );
-				}
-			}
+		if ( 'page' === $post_type && $all_have_page_filter && ! empty( $allowed_pages ) ) {
+			$page_ids = $this->get_page_ids_by_slugs( $allowed_pages );
+			$query->set( 'post__in', ! empty( $page_ids ) ? $page_ids : array( 0 ) );
 		}
 	}
 
 	/**
 	 * Gibt Seiten-IDs für eine Liste von Slugs zurück.
-	 * Unterstützt auch verschachtelte Slugs (z.B. "eltern/kind").
+	 * Unterstützt verschachtelte Slugs (z.B. "eltern/kind").
 	 *
 	 * @param array $slugs Array von Seiten-Slugs
-	 * @return array Array von Post-IDs
+	 * @return array       Array von Post-IDs
 	 */
 	private function get_page_ids_by_slugs( array $slugs ) {
 		$ids = array();

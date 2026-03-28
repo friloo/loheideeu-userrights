@@ -15,6 +15,8 @@ class WP_UserRights_Admin_Menu {
 		add_action( 'admin_menu', array( $this, 'enforce_permissions' ), 9999 );
 		// Direktzugriff-Schutz: prüft auch ohne Menü-Klick ob eine Seite erlaubt ist
 		add_action( 'admin_init', array( $this, 'check_direct_access' ) );
+		// Hinweis anzeigen wenn jemand auf das Dashboard umgeleitet wurde
+		add_action( 'admin_notices', array( $this, 'show_access_denied_notice' ) );
 	}
 
 	// -------------------------------------------------------------------------
@@ -87,9 +89,24 @@ class WP_UserRights_Admin_Menu {
 		$allowed_slugs = $this->get_allowed_slugs_for_user( $user );
 
 		if ( ! $this->is_current_page_allowed( $pagenow, $allowed_slugs ) ) {
-			wp_safe_redirect( admin_url( 'index.php' ) );
+			wp_safe_redirect( add_query_arg( 'wp_userrights_denied', '1', admin_url( 'index.php' ) ) );
 			exit;
 		}
+	}
+
+	/**
+	 * Zeigt einen Admin-Hinweis wenn der User auf eine verbotene Seite zugegriffen hat
+	 * und zum Dashboard weitergeleitet wurde.
+	 */
+	public function show_access_denied_notice() {
+		if ( empty( $_GET['wp_userrights_denied'] ) ) {
+			return;
+		}
+		?>
+		<div class="notice notice-warning is-dismissible">
+			<p><?php esc_html_e( 'Sie haben keinen Zugriff auf die angeforderte Seite.', 'wp-userrights' ); ?></p>
+		</div>
+		<?php
 	}
 
 	/**

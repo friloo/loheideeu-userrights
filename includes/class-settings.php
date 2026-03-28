@@ -73,6 +73,7 @@ class WP_UserRights_Settings {
 			$node = array(
 				'slug'     => $slug,
 				'label'    => $label ?: $slug,
+				'cap'      => isset( $item[1] ) ? $item[1] : 'read',
 				'children' => array(),
 			);
 
@@ -88,6 +89,7 @@ class WP_UserRights_Settings {
 					$node['children'][] = array(
 						'slug'  => $sub_slug,
 						'label' => $sub_label,
+						'cap'   => isset( $sub[1] ) ? $sub[1] : 'read',
 					);
 				}
 			}
@@ -189,6 +191,10 @@ class WP_UserRights_Settings {
 					<div class="wp-userrights-menu-tree">
 						<?php foreach ( $menu_tree as $top_item ) : ?>
 							<div class="menu-item-top">
+								<?php // Capability dieses Top-Level-Eintrags für automatische Capability-Zuweisung ?>
+								<input type="hidden"
+									name="menu_cap_map[<?php echo esc_attr( $top_item['slug'] ); ?>]"
+									value="<?php echo esc_attr( $top_item['cap'] ); ?>">
 								<label class="menu-item-label top-level">
 									<input type="checkbox"
 										name="menu_slugs[]"
@@ -203,10 +209,13 @@ class WP_UserRights_Settings {
 								<?php if ( ! empty( $top_item['children'] ) ) : ?>
 								<div class="submenu-items">
 									<?php foreach ( $top_item['children'] as $child ) : ?>
-									<?php // Hidden input: Eltern-Slug für dieses Kind – wird beim Speichern zum Auto-Include genutzt ?>
+									<?php // Eltern-Slug und Capability für dieses Kind (Auto-Include + Capability-Sync) ?>
 									<input type="hidden"
 										name="menu_parent_map[<?php echo esc_attr( $child['slug'] ); ?>]"
 										value="<?php echo esc_attr( $top_item['slug'] ); ?>">
+									<input type="hidden"
+										name="menu_cap_map[<?php echo esc_attr( $child['slug'] ); ?>]"
+										value="<?php echo esc_attr( $child['cap'] ); ?>">
 									<label class="menu-item-label sub-level">
 										<input type="checkbox"
 											name="menu_slugs[]"
@@ -328,11 +337,20 @@ class WP_UserRights_Settings {
 		$raw_pages   = isset( $_POST['allowed_page_slugs'] ) ? sanitize_text_field( $_POST['allowed_page_slugs'] ) : '';
 		$clean_pages = array_values( array_filter( array_map( 'sanitize_title', explode( ',', $raw_pages ) ) ) );
 
+		// Punkt 1: Capability-Map aus dem Formular lesen und Capabilities der Rolle synchronisieren
+		$raw_cap_map   = isset( $_POST['menu_cap_map'] ) ? (array) $_POST['menu_cap_map'] : array();
+		$clean_cap_map = array();
+		foreach ( $raw_cap_map as $s => $c ) {
+			$clean_cap_map[ sanitize_text_field( $s ) ] = sanitize_key( $c );
+		}
+		$managed_caps = $this->sync_role_capabilities( $role, $clean_slugs, $clean_cap_map );
+
 		$permissions          = get_option( WP_USERRIGHTS_OPTION, array() );
 		$permissions[ $role ] = array(
 			'menu_slugs'         => $clean_slugs,
 			'allowed_categories' => $clean_cats,
 			'allowed_page_slugs' => $clean_pages,
+			'managed_caps'       => $managed_caps,
 		);
 
 		update_option( WP_USERRIGHTS_OPTION, $permissions );
@@ -348,5 +366,58 @@ class WP_UserRights_Settings {
 			)
 		);
 		exit;
+	}
+
+	/**
+	 * Synchronisiert die WordPress-Capabilities einer Rolle mit den erlaubten Menüpunkten.
+	 *
+	 * - Fügt benötigte Capabilities hinzu (nur solche, die durch dieses Plugin vergeben werden)
+	 * - Entfernt zuvor von diesem Plugin vergebene Capabilities, die nicht mehr benötigt werden
+	 * - Capabilities die die Rolle bereits vor der Plugin-Verwaltung hatte, werden nie entfernt
+	 *
+	 * @param string $role_key   Rollen-Schlüssel
+	 * @param array  $new_slugs  Aktuell erlaubte Menü-Slugs
+	 * @param array  $cap_map    Zuordnung Slug → benötigte Capability (aus Formular)
+	 * @return array             Liste der jetzt durch dieses Plugin verwalteten Capabilities
+	 */
+	private function sync_role_capabilities( $role_key, array $new_slugs, array $cap_map ) {
+		$role_obj = get_role( $role_key );
+		if ( ! $role_obj ) {
+			return array();
+		}
+
+		$permissions  = get_option( WP_USERRIGHTS_OPTION, array() );
+		$managed_caps = isset( $permissions[ $role_key ]['managed_caps'] )
+			? (array) $permissions[ $role_key ]['managed_caps']
+			: array();
+
+		// Capabilities berechnen die die neuen Slugs benötigen
+		$needed_caps = array();
+		foreach ( $new_slugs as $slug ) {
+			if ( ! empty( $cap_map[ $slug ] ) ) {
+				$needed_caps[] = $cap_map[ $slug ];
+			}
+		}
+		// 'read' ist für jeden Backend-Zugang nötig
+		if ( ! empty( $new_slugs ) ) {
+			$needed_caps[] = 'read';
+		}
+		$needed_caps = array_values( array_unique( $needed_caps ) );
+
+		// Neue Capabilities hinzufügen und in managed_caps aufnehmen
+		foreach ( $needed_caps as $cap ) {
+			$role_obj->add_cap( $cap, true );
+			if ( ! in_array( $cap, $managed_caps, true ) ) {
+				$managed_caps[] = $cap;
+			}
+		}
+
+		// Capabilities entfernen die wir früher hinzugefügt haben, aber jetzt nicht mehr brauchen
+		$caps_to_remove = array_diff( $managed_caps, $needed_caps );
+		foreach ( $caps_to_remove as $cap ) {
+			$role_obj->remove_cap( $cap );
+		}
+
+		return $needed_caps;
 	}
 }
