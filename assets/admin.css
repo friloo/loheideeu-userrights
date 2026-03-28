@@ -1,0 +1,167 @@
+/* WP User Rights – Admin Styles */
+
+.wp-userrights-wrap {
+    max-width: 900px;
+}
+
+.wp-userrights-wrap h1 {
+    margin-bottom: 5px;
+}
+
+.wp-userrights-wrap > .description {
+    margin-bottom: 20px;
+    color: #646970;
+}
+
+/* Rollenauswahl */
+.wp-userrights-role-selector {
+    margin: 20px 0;
+    display: flex;
+    align-items: center;
+    gap: 10px;
+}
+
+.wp-userrights-role-selector select {
+    min-width: 200px;
+    font-size: 14px;
+}
+
+/* Abschnitte */
+.wp-userrights-section {
+    background: #fff;
+    border: 1px solid #c3c4c7;
+    border-radius: 4px;
+    padding: 20px 24px;
+    margin-bottom: 20px;
+}
+
+.wp-userrights-section h2 {
+    margin-top: 0;
+    padding-bottom: 12px;
+    border-bottom: 1px solid #e0e0e0;
+    font-size: 16px;
+}
+
+/* Toolbar */
+.wp-userrights-toolbar {
+    margin-bottom: 16px;
+    display: flex;
+    gap: 8px;
+}
+
+/* Menü-Baum */
+.wp-userrights-menu-tree {
+    display: flex;
+    flex-direction: column;
+    gap: 2px;
+}
+
+.menu-item-top {
+    border: 1px solid #e0e0e0;
+    border-radius: 3px;
+    overflow: hidden;
+}
+
+.menu-item-label {
+    display: flex;
+    align-items: center;
+    gap: 8px;
+    padding: 8px 12px;
+    cursor: pointer;
+    transition: background 0.1s;
+    margin: 0;
+    font-weight: normal;
+    line-height: 1.6;
+}
+
+.menu-item-label:hover {
+    background: #f0f6fc;
+}
+
+.menu-item-label.top-level {
+    background: #f6f7f7;
+    font-weight: 600;
+    border-bottom: 1px solid #e0e0e0;
+}
+
+.menu-item-label.top-level:hover {
+    background: #e8f0fe;
+}
+
+/* Letzte Top-Level ohne Kinder: kein border-bottom */
+.menu-item-top:not(:has(.submenu-items)) .menu-item-label.top-level {
+    border-bottom: none;
+}
+
+/* Falls :has() nicht unterstützt wird – JS übernimmt */
+.menu-item-top.no-children .menu-item-label.top-level {
+    border-bottom: none;
+}
+
+.submenu-items {
+    padding: 4px 0;
+    background: #fff;
+}
+
+.menu-item-label.sub-level {
+    padding-left: 36px;
+    font-size: 13px;
+    color: #3c434a;
+}
+
+.menu-item-label.sub-level:hover {
+    background: #f0f6fc;
+}
+
+/* Checkboxen */
+.menu-item-label input[type="checkbox"] {
+    margin: 0;
+    flex-shrink: 0;
+    cursor: pointer;
+}
+
+/* Dashicons in Labels */
+.menu-item-label .dashicons {
+    font-size: 16px;
+    width: 16px;
+    height: 16px;
+    flex-shrink: 0;
+    color: #787c82;
+}
+
+.menu-item-label.top-level .dashicons {
+    color: #50575e;
+}
+
+/* Slug-Hinweis */
+.slug-hint {
+    margin-left: auto;
+    font-size: 11px;
+    color: #a0a5aa;
+    background: transparent;
+    padding: 0;
+    border: none;
+    font-family: monospace;
+    max-width: 240px;
+    overflow: hidden;
+    text-overflow: ellipsis;
+    white-space: nowrap;
+}
+
+/* Checked-Zustand hervorheben */
+.menu-item-label:has(input:checked) {
+    background: #edf7ed;
+}
+
+.menu-item-label.top-level:has(input:checked) {
+    background: #d8f0d8;
+}
+
+/* Formular-Abschnitt */
+.wp-userrights-form .form-table th {
+    width: 220px;
+}
+
+.wp-userrights-form .submit {
+    padding-left: 0;
+}
