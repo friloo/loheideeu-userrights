@@ -157,6 +157,43 @@
     background: #d8f0d8;
 }
 
+/* Capability-Vorschau */
+.wp-userrights-cap-preview {
+    margin: 12px 0 4px;
+    padding: 10px 14px;
+    background: #f0f6fc;
+    border: 1px solid #c5d9ed;
+    border-radius: 3px;
+    display: flex;
+    align-items: center;
+    flex-wrap: wrap;
+    gap: 6px;
+    font-size: 13px;
+}
+
+.cap-preview-label {
+    color: #2271b1;
+    font-weight: 600;
+    flex-shrink: 0;
+}
+
+.cap-preview-list {
+    display: flex;
+    flex-wrap: wrap;
+    gap: 4px;
+}
+
+.cap-badge {
+    display: inline-block;
+    padding: 2px 8px;
+    background: #2271b1;
+    color: #fff;
+    border-radius: 3px;
+    font-size: 12px;
+    font-family: monospace;
+    border: none;
+}
+
 /* Formular-Abschnitt */
 .wp-userrights-form .form-table th {
     width: 220px;

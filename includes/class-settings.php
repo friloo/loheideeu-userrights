@@ -128,6 +128,10 @@ class WP_UserRights_Settings {
 		$allowed_slugs      = isset( $role_perms['menu_slugs'] ) ? (array) $role_perms['menu_slugs'] : array();
 		$allowed_categories = isset( $role_perms['allowed_categories'] ) ? implode( ', ', (array) $role_perms['allowed_categories'] ) : '';
 		$allowed_pages      = isset( $role_perms['allowed_page_slugs'] ) ? implode( ', ', (array) $role_perms['allowed_page_slugs'] ) : '';
+
+		// WordPress-Standardrollen die bereits eingebaute Capabilities haben
+		$builtin_roles = array( 'editor', 'author', 'contributor', 'subscriber' );
+		$is_builtin    = in_array( $selected_role, $builtin_roles, true );
 		?>
 		<div class="wrap wp-userrights-wrap">
 			<h1><?php esc_html_e( 'Benutzerrechte', 'wp-userrights' ); ?></h1>
@@ -161,6 +165,21 @@ class WP_UserRights_Settings {
 				</select>
 			</div>
 
+			<?php if ( $is_builtin ) : ?>
+			<div class="notice notice-warning inline">
+				<p>
+					<strong><?php esc_html_e( 'Achtung: WordPress-Standardrolle', 'wp-userrights' ); ?></strong><br>
+					<?php
+					printf(
+						/* translators: %s: role name */
+						esc_html__( 'Die Rolle „%s" ist eine eingebaute WordPress-Rolle mit vordefinierten Berechtigungen. Änderungen hier können das normale WordPress-Verhalten dieser Rolle beeinflussen. Es wird empfohlen, stattdessen eigene benutzerdefinierte Rollen zu verwenden.', 'wp-userrights' ),
+						esc_html( translate_user_role( $roles[ $selected_role ]['name'] ) )
+					);
+					?>
+				</p>
+			</div>
+			<?php endif; ?>
+
 			<!-- Formular für gewählte Rolle -->
 			<form method="post" action="<?php echo esc_url( admin_url( 'admin-post.php' ) ); ?>" class="wp-userrights-form">
 				<?php wp_nonce_field( 'wp_userrights_save_' . $selected_role, 'wp_userrights_nonce' ); ?>
@@ -183,6 +202,12 @@ class WP_UserRights_Settings {
 						<button type="button" class="button" id="wp-userrights-uncheck-all">
 							<?php esc_html_e( 'Alle abwählen', 'wp-userrights' ); ?>
 						</button>
+					</div>
+
+					<!-- Capability-Vorschau: wird per JavaScript aktualisiert -->
+					<div id="wp-userrights-cap-preview" class="wp-userrights-cap-preview" style="display:none;">
+						<span class="cap-preview-label"><?php esc_html_e( 'Wird vergeben:', 'wp-userrights' ); ?></span>
+						<span id="wp-userrights-cap-list" class="cap-preview-list"></span>
 					</div>
 
 					<?php if ( empty( $menu_tree ) ) : ?>

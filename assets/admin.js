@@ -77,8 +77,47 @@
             });
         }
 
+        // Capability-Vorschau: liest alle gecheckte Slugs, schlägt deren Cap nach und zeigt sie an
+        function updateCapPreview() {
+            var caps    = [];
+            var $box    = $('#wp-userrights-cap-preview');
+            var $list   = $('#wp-userrights-cap-list');
+
+            $('.menu-checkbox:checked').each(function () {
+                var slug = $(this).val();
+                // Cap aus dem passenden hidden input lesen: name="menu_cap_map[slug]"
+                var cap  = $('input[name="menu_cap_map[' + slug.replace(/[[\]]/g, '\\$&') + ']"]').val();
+                if (cap && caps.indexOf(cap) === -1) {
+                    caps.push(cap);
+                }
+            });
+
+            // 'read' ist immer dabei wenn mindestens ein Eintrag gewählt ist
+            if (caps.length > 0 && caps.indexOf('read') === -1) {
+                caps.unshift('read');
+            }
+
+            if (caps.length === 0) {
+                $box.hide();
+                return;
+            }
+
+            var html = caps.map(function (c) {
+                return '<code class="cap-badge">' + c + '</code>';
+            }).join(' ');
+
+            $list.html(html);
+            $box.show();
+        }
+
+        // Vorschau bei jeder Checkbox-Änderung aktualisieren
+        $(document).on('change', '.menu-checkbox', function () {
+            updateCapPreview();
+        });
+
         initIndeterminate();
         markNoChildren();
+        updateCapPreview(); // Beim Laden direkt aktualisieren (gespeicherte Einstellungen)
     });
 
 }(jQuery));
