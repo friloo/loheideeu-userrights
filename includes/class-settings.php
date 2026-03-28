@@ -203,6 +203,10 @@ class WP_UserRights_Settings {
 								<?php if ( ! empty( $top_item['children'] ) ) : ?>
 								<div class="submenu-items">
 									<?php foreach ( $top_item['children'] as $child ) : ?>
+									<?php // Hidden input: Eltern-Slug für dieses Kind – wird beim Speichern zum Auto-Include genutzt ?>
+									<input type="hidden"
+										name="menu_parent_map[<?php echo esc_attr( $child['slug'] ); ?>]"
+										value="<?php echo esc_attr( $top_item['slug'] ); ?>">
 									<label class="menu-item-label sub-level">
 										<input type="checkbox"
 											name="menu_slugs[]"
@@ -301,8 +305,20 @@ class WP_UserRights_Settings {
 		}
 
 		// Erlaubte Menü-Slugs
-		$raw_slugs    = isset( $_POST['menu_slugs'] ) ? (array) $_POST['menu_slugs'] : array();
-		$clean_slugs  = array_values( array_filter( array_map( 'sanitize_text_field', $raw_slugs ) ) );
+		$raw_slugs   = isset( $_POST['menu_slugs'] ) ? (array) $_POST['menu_slugs'] : array();
+		$clean_slugs = array_values( array_filter( array_map( 'sanitize_text_field', $raw_slugs ) ) );
+
+		// Punkt 2: Eltern-Slug automatisch miteinschließen wenn ein Kind erlaubt ist.
+		// Das parent_map kommt als hidden input aus dem Formular: menu_parent_map[child] = parent
+		$parent_map = isset( $_POST['menu_parent_map'] ) ? (array) $_POST['menu_parent_map'] : array();
+		foreach ( $clean_slugs as $slug ) {
+			if ( isset( $parent_map[ $slug ] ) ) {
+				$parent_slug = sanitize_text_field( $parent_map[ $slug ] );
+				if ( $parent_slug && ! in_array( $parent_slug, $clean_slugs, true ) ) {
+					$clean_slugs[] = $parent_slug;
+				}
+			}
+		}
 
 		// Kategorie-Filter
 		$raw_cats   = isset( $_POST['allowed_categories'] ) ? sanitize_text_field( $_POST['allowed_categories'] ) : '';

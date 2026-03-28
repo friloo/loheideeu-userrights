@@ -27,6 +27,13 @@ function wp_userrights_activate() {
 
 add_action( 'plugins_loaded', 'wp_userrights_init' );
 function wp_userrights_init() {
+	// Punkt 4: Übersetzungen laden
+	load_plugin_textdomain(
+		'wp-userrights',
+		false,
+		dirname( plugin_basename( __FILE__ ) ) . '/languages'
+	);
+
 	if ( ! is_admin() ) {
 		return;
 	}
