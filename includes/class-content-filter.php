@@ -1,6 +1,6 @@
 <?php
 /**
- * Inhaltsfilter: Schränkt Admin-Listen und REST API für Beiträge/Seiten ein.
+ * Inhaltsfilter: Schränkt Admin-Listen und REST API für Beiträge/Seiten/Medien ein.
  * Gilt für klassische Admin-Listenansichten und den Gutenberg/REST-API-Kontext.
  */
 
@@ -11,41 +11,190 @@ if ( ! defined( 'ABSPATH' ) ) {
 class WP_UserRights_Content_Filter {
 
 	public function __construct() {
-		// Klassische Admin-Listenansicht
+		// Listenansichten und REST API
 		add_action( 'pre_get_posts', array( $this, 'filter_content' ) );
+		// Kategorie-Auswahl im Post-Editor einschränken
+		add_filter( 'get_terms', array( $this, 'filter_category_terms' ), 10, 4 );
+		// Kategorien beim Speichern eines Beitrags erzwingen
+		add_action( 'save_post_post', array( $this, 'enforce_category_on_save' ), 20, 2 );
+		// Medien-Modal (Gutenberg + klassischer Editor)
+		add_filter( 'ajax_query_attachments_args', array( $this, 'filter_media_modal' ) );
 	}
+
+	// =========================================================================
+	// Listenansichten + REST API
+	// =========================================================================
 
 	public function filter_content( $query ) {
 		$is_rest = defined( 'REST_REQUEST' ) && REST_REQUEST;
 
-		// Nur im Admin-Bereich oder bei REST-API-Anfragen anwenden
 		if ( ! is_admin() && ! $is_rest ) {
 			return;
 		}
-
-		// Nur Haupt-Query
 		if ( ! $query->is_main_query() ) {
 			return;
 		}
 
 		$user = wp_get_current_user();
-
 		if ( ! $user->exists() || in_array( 'administrator', (array) $user->roles, true ) ) {
 			return;
 		}
 
-		$permissions = get_option( WP_USERRIGHTS_OPTION, array() );
+		$r         = $this->get_user_content_restrictions( $user );
+		$post_type = $query->get( 'post_type' );
 
-		// Multi-Rollen-Union: Sammle erlaubte Kategorien und Seiten über alle Rollen des Users.
-		// Logik: Nur einschränken wenn ALLE Rollen des Users einen Filter konfiguriert haben.
-		// Hat eine Rolle keinen Filter, darf der User alles sehen (Vereinigung = unbegrenzt).
-		$allowed_cats          = array();
-		$allowed_pages         = array();
-		$all_have_cat_filter   = true;
-		$all_have_page_filter  = true;
+		// Beiträge nach Kategorie filtern
+		if ( ( 'post' === $post_type || '' === $post_type ) && $r['restrict_cats'] ) {
+			$query->set( 'tax_query', array(
+				array(
+					'taxonomy' => 'category',
+					'field'    => 'slug',
+					'terms'    => $r['cats'],
+				),
+			) );
+		}
+
+		// Seiten nach Slug filtern
+		if ( 'page' === $post_type && $r['restrict_pages'] ) {
+			$page_ids = $this->get_page_ids_by_slugs( $r['pages'] );
+			$query->set( 'post__in', ! empty( $page_ids ) ? $page_ids : array( 0 ) );
+		}
+
+		// Mediathek: nur eigene Dateien
+		if ( 'attachment' === $post_type && $r['restrict_media'] ) {
+			$query->set( 'author', $user->ID );
+		}
+	}
+
+	// =========================================================================
+	// Kategorie-Auswahl im Post-Editor einschränken
+	// =========================================================================
+
+	public function filter_category_terms( $terms, $taxonomies, $args, $term_query = null ) {
+		if ( ! is_admin() ) {
+			return $terms;
+		}
+
+		$user = wp_get_current_user();
+		if ( ! $user->exists() || current_user_can( 'manage_options' ) ) {
+			return $terms;
+		}
+
+		$taxs = is_array( $taxonomies ) ? $taxonomies : array( $taxonomies );
+		if ( ! in_array( 'category', $taxs, true ) ) {
+			return $terms;
+		}
+
+		$r = $this->get_user_content_restrictions( $user );
+		if ( ! $r['restrict_cats'] ) {
+			return $terms;
+		}
+
+		// Nur WP_Term-Objekte filtern; reine ID-Arrays unverändert lassen
+		return array_values( array_filter( $terms, function ( $term ) use ( $r ) {
+			if ( ! ( $term instanceof WP_Term ) ) {
+				return true;
+			}
+			return in_array( $term->slug, $r['cats'], true );
+		} ) );
+	}
+
+	// =========================================================================
+	// Kategorien beim Speichern erzwingen
+	// =========================================================================
+
+	public function enforce_category_on_save( $post_id, $post ) {
+		if ( defined( 'DOING_AUTOSAVE' ) && DOING_AUTOSAVE ) {
+			return;
+		}
+		if ( wp_is_post_revision( $post_id ) ) {
+			return;
+		}
+
+		$user = wp_get_current_user();
+		if ( ! $user->exists() || current_user_can( 'manage_options' ) ) {
+			return;
+		}
+
+		$r = $this->get_user_content_restrictions( $user );
+		if ( ! $r['restrict_cats'] ) {
+			return;
+		}
+
+		$current_terms = wp_get_post_terms( $post_id, 'category' );
+		if ( is_wp_error( $current_terms ) ) {
+			return;
+		}
+
+		// Nur erlaubte Kategorien behalten
+		$valid_ids = array();
+		foreach ( $current_terms as $term ) {
+			if ( in_array( $term->slug, $r['cats'], true ) ) {
+				$valid_ids[] = $term->term_id;
+			}
+		}
+
+		// Keine erlaubte Kategorie gesetzt → erste erlaubte erzwingen
+		if ( empty( $valid_ids ) ) {
+			$fallback = get_term_by( 'slug', $r['cats'][0], 'category' );
+			if ( $fallback ) {
+				$valid_ids = array( $fallback->term_id );
+			}
+		}
+
+		if ( ! empty( $valid_ids ) ) {
+			// Hook temporär entfernen um Endlosschleifen zu verhindern
+			remove_action( 'save_post_post', array( $this, 'enforce_category_on_save' ), 20 );
+			wp_set_post_terms( $post_id, $valid_ids, 'category' );
+			add_action( 'save_post_post', array( $this, 'enforce_category_on_save' ), 20, 2 );
+		}
+	}
+
+	// =========================================================================
+	// Medien-Modal (AJAX)
+	// =========================================================================
+
+	public function filter_media_modal( $args ) {
+		$user = wp_get_current_user();
+		if ( ! $user->exists() || current_user_can( 'manage_options' ) ) {
+			return $args;
+		}
+
+		$r = $this->get_user_content_restrictions( $user );
+		if ( $r['restrict_media'] ) {
+			$args['author'] = $user->ID;
+		}
+		return $args;
+	}
+
+	// =========================================================================
+	// Hilfsmethoden
+	// =========================================================================
+
+	/**
+	 * Berechnet die Inhalts-Einschränkungen für einen User.
+	 *
+	 * Rollen ohne Plugin-Konfiguration (z. B. Abonnent als Basis-Rolle) werden
+	 * ignoriert — sie heben die Einschränkungen konfigurierter Rollen nicht auf.
+	 */
+	private function get_user_content_restrictions( $user ) {
+		$permissions          = get_option( WP_USERRIGHTS_OPTION, array() );
+		$allowed_cats         = array();
+		$allowed_pages        = array();
+		$restrict_media       = false;
+		$all_have_cat_filter  = true;
+		$all_have_page_filter = true;
+		$has_configured_role  = false;
 
 		foreach ( (array) $user->roles as $role ) {
 			$role_perms = isset( $permissions[ $role ] ) ? $permissions[ $role ] : array();
+
+			// Rollen ohne Plugin-Konfiguration überspringen
+			if ( empty( $role_perms ) || empty( $role_perms['menu_slugs'] ) ) {
+				continue;
+			}
+
+			$has_configured_role = true;
 
 			$role_cats  = isset( $role_perms['allowed_categories'] ) ? (array) $role_perms['allowed_categories'] : array();
 			$role_pages = isset( $role_perms['allowed_page_slugs'] ) ? (array) $role_perms['allowed_page_slugs'] : array();
@@ -61,50 +210,36 @@ class WP_UserRights_Content_Filter {
 			} else {
 				$allowed_pages = array_unique( array_merge( $allowed_pages, $role_pages ) );
 			}
+
+			if ( ! empty( $role_perms['restrict_media'] ) ) {
+				$restrict_media = true;
+			}
 		}
 
-		$post_type = $query->get( 'post_type' );
-
-		// Beiträge nach Kategorie filtern
-		if ( ( 'post' === $post_type || '' === $post_type ) && $all_have_cat_filter && ! empty( $allowed_cats ) ) {
-			$query->set( 'tax_query', array(
-				array(
-					'taxonomy' => 'category',
-					'field'    => 'slug',
-					'terms'    => $allowed_cats,
-				),
-			) );
-		}
-
-		// Seiten nach Slug filtern
-		if ( 'page' === $post_type && $all_have_page_filter && ! empty( $allowed_pages ) ) {
-			$page_ids = $this->get_page_ids_by_slugs( $allowed_pages );
-			$query->set( 'post__in', ! empty( $page_ids ) ? $page_ids : array( 0 ) );
-		}
+		return array(
+			'cats'           => $allowed_cats,
+			'pages'          => $allowed_pages,
+			'restrict_cats'  => $has_configured_role && $all_have_cat_filter && ! empty( $allowed_cats ),
+			'restrict_pages' => $has_configured_role && $all_have_page_filter && ! empty( $allowed_pages ),
+			'restrict_media' => $restrict_media,
+		);
 	}
 
 	/**
 	 * Gibt Seiten-IDs für eine Liste von Slugs zurück.
-	 * Unterstützt verschachtelte Slugs (z.B. "eltern/kind").
-	 *
-	 * @param array $slugs Array von Seiten-Slugs
-	 * @return array       Array von Post-IDs
 	 */
 	private function get_page_ids_by_slugs( array $slugs ) {
 		$ids = array();
-
 		foreach ( $slugs as $slug ) {
 			$slug = trim( $slug );
 			if ( empty( $slug ) ) {
 				continue;
 			}
-
 			$page = get_page_by_path( $slug, OBJECT, 'page' );
 			if ( $page ) {
 				$ids[] = $page->ID;
 			}
 		}
-
 		return array_unique( $ids );
 	}
 }

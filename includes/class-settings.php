@@ -13,6 +13,10 @@ class WP_UserRights_Settings {
 		add_action( 'admin_menu',            array( $this, 'register_settings_page' ) );
 		add_action( 'admin_enqueue_scripts', array( $this, 'enqueue_assets' ) );
 		add_action( 'admin_post_wp_userrights_save', array( $this, 'save_settings' ) );
+		// WP-Benutzerliste: Spalte für zugewiesene Plugin-Rollen
+		add_filter( 'manage_users_columns',       array( $this, 'add_users_role_column' ) );
+		add_filter( 'manage_users_custom_column', array( $this, 'render_users_role_column' ), 10, 3 );
+		add_action( 'admin_head-users.php',       array( $this, 'users_page_inline_styles' ) );
 	}
 
 	public function register_settings_page() {
@@ -112,6 +116,69 @@ class WP_UserRights_Settings {
 	}
 
 	// =========================================================================
+	// WP-Benutzerliste: Plugin-Rollen-Spalte
+	// =========================================================================
+
+	public function add_users_role_column( $columns ) {
+		$columns['wpur_roles'] = '<span class="dashicons dashicons-shield-alt" style="font-size:16px;vertical-align:middle;line-height:1.4;" title="'
+			. esc_attr__( 'Plugin-Rollen', 'wp-userrights' ) . '"></span> '
+			. esc_html__( 'Plugin-Rollen', 'wp-userrights' );
+		return $columns;
+	}
+
+	public function render_users_role_column( $output, $column_name, $user_id ) {
+		if ( 'wpur_roles' !== $column_name ) {
+			return $output;
+		}
+
+		$managed_roles = WP_UserRights_Role_Manager::get_managed_roles();
+		if ( empty( $managed_roles ) ) {
+			return '<span class="wpur-col-dash">—</span>';
+		}
+
+		$user       = get_userdata( $user_id );
+		$user_roles = (array) $user->roles;
+		$all_roles  = wp_roles()->roles;
+		$badges     = array();
+
+		foreach ( $managed_roles as $role_slug ) {
+			if ( ! in_array( $role_slug, $user_roles, true ) || ! isset( $all_roles[ $role_slug ] ) ) {
+				continue;
+			}
+			$label    = esc_html( translate_user_role( $all_roles[ $role_slug ]['name'] ) );
+			$edit_url = esc_url( add_query_arg(
+				array( 'page' => 'wp-userrights', 'tab' => 'permissions', 'role' => $role_slug ),
+				admin_url( 'admin.php' )
+			) );
+			$badges[] = '<a href="' . $edit_url . '" class="wpur-col-badge">' . $label . '</a>';
+		}
+
+		return ! empty( $badges ) ? implode( ' ', $badges ) : '<span class="wpur-col-dash">—</span>';
+	}
+
+	public function users_page_inline_styles() {
+		?>
+		<style>
+		.wpur-col-badge {
+			display: inline-block;
+			padding: 2px 8px;
+			background: #f0f6fc;
+			border: 1px solid #c3d9f0;
+			border-radius: 3px;
+			font-size: 11px;
+			color: #135e96;
+			text-decoration: none;
+			white-space: nowrap;
+			margin: 1px 2px 1px 0;
+			vertical-align: middle;
+		}
+		.wpur-col-badge:hover { background: #dbeafe; color: #0c4a8f; }
+		.wpur-col-dash { color: #999; }
+		</style>
+		<?php
+	}
+
+	// =========================================================================
 	// Haupt-Render: Plugin-Header + Tab-Navigation
 	// =========================================================================
 
@@ -201,6 +268,7 @@ class WP_UserRights_Settings {
 		$allowed_slugs      = isset( $role_perms['menu_slugs'] ) ? (array) $role_perms['menu_slugs'] : array();
 		$allowed_categories = isset( $role_perms['allowed_categories'] ) ? implode( ', ', (array) $role_perms['allowed_categories'] ) : '';
 		$allowed_pages      = isset( $role_perms['allowed_page_slugs'] ) ? implode( ', ', (array) $role_perms['allowed_page_slugs'] ) : '';
+		$restrict_media     = ! empty( $role_perms['restrict_media'] );
 
 		$builtin_roles = array( 'editor', 'author', 'contributor', 'subscriber' );
 		$is_builtin    = in_array( $selected_role, $builtin_roles, true );
@@ -343,6 +411,16 @@ class WP_UserRights_Settings {
 							<input type="text" id="wp-userrights-pages" name="allowed_page_slugs"
 								value="<?php echo esc_attr( $allowed_pages ); ?>" class="regular-text" placeholder="mav, kuenstlerteam">
 							<p class="description"><?php esc_html_e( 'Seiten-Slugs, kommagetrennt.', 'wp-userrights' ); ?></p>
+						</td>
+					</tr>
+					<tr>
+						<th scope="row"><?php esc_html_e( 'Mediathek einschränken', 'wp-userrights' ); ?></th>
+						<td>
+							<label>
+								<input type="checkbox" name="restrict_media" value="1" <?php checked( $restrict_media ); ?>>
+								<?php esc_html_e( 'Nur eigene hochgeladene Medien anzeigen', 'wp-userrights' ); ?>
+							</label>
+							<p class="description"><?php esc_html_e( 'Die Rolle sieht in der Mediathek und im Medien-Modal nur Dateien, die sie selbst hochgeladen hat.', 'wp-userrights' ); ?></p>
 						</td>
 					</tr>
 				</table>
@@ -778,6 +856,9 @@ class WP_UserRights_Settings {
 		$raw_pages   = isset( $_POST['allowed_page_slugs'] ) ? sanitize_text_field( $_POST['allowed_page_slugs'] ) : '';
 		$clean_pages = array_values( array_filter( array_map( 'sanitize_title', explode( ',', $raw_pages ) ) ) );
 
+		// Mediathek einschränken
+		$restrict_media = ! empty( $_POST['restrict_media'] );
+
 		// Capability-Synchronisierung
 		$raw_cap_map   = isset( $_POST['menu_cap_map'] ) ? (array) $_POST['menu_cap_map'] : array();
 		$clean_cap_map = array();
@@ -791,6 +872,7 @@ class WP_UserRights_Settings {
 			'menu_slugs'         => $clean_slugs,
 			'allowed_categories' => $clean_cats,
 			'allowed_page_slugs' => $clean_pages,
+			'restrict_media'     => $restrict_media,
 			'managed_caps'       => $managed_caps,
 		);
 
@@ -827,6 +909,22 @@ class WP_UserRights_Settings {
 			$needed_caps[] = 'read';
 		}
 		$needed_caps = array_values( array_unique( $needed_caps ) );
+
+		// Erweiterte Capabilities: edit_pages allein reicht nicht um fremde/veröffentlichte
+		// Einträge zu bearbeiten — zugehörige Caps automatisch mitgeben.
+		$cap_expansions = array(
+			'edit_posts'   => array( 'edit_others_posts', 'edit_published_posts' ),
+			'edit_pages'   => array( 'edit_others_pages', 'edit_published_pages' ),
+			'delete_posts' => array( 'delete_others_posts', 'delete_published_posts' ),
+			'delete_pages' => array( 'delete_others_pages', 'delete_published_pages' ),
+		);
+		$extra = array();
+		foreach ( $needed_caps as $cap ) {
+			if ( isset( $cap_expansions[ $cap ] ) ) {
+				$extra = array_merge( $extra, $cap_expansions[ $cap ] );
+			}
+		}
+		$needed_caps = array_values( array_unique( array_merge( $needed_caps, $extra ) ) );
 
 		foreach ( $needed_caps as $cap ) {
 			$role_obj->add_cap( $cap, true );
