@@ -15,8 +15,11 @@ class WP_UserRights_Content_Filter {
 		add_action( 'pre_get_posts', array( $this, 'filter_content' ) );
 		// Kategorie-Auswahl: direkt am Term-Query-Objekt (klassisch + Gutenberg + REST)
 		add_action( 'pre_get_terms', array( $this, 'restrict_category_query' ) );
-		// Kategorien beim Speichern erzwingen (Absicherung gegen direkte Requests)
+		// Kategorien erzwingen: klassischer Editor (save_post feuert nach wp_set_post_terms)
 		add_action( 'save_post_post', array( $this, 'enforce_category_on_save' ), 20, 2 );
+		// Kategorien erzwingen: Gutenberg REST API (handle_terms läuft NACH save_post,
+		// deshalb eigener Hook der nach dem vollständigen Speichern feuert)
+		add_action( 'rest_after_insert_post', array( $this, 'enforce_category_after_rest_save' ) );
 		// Medien-Modal (Gutenberg + klassischer Editor)
 		add_filter( 'ajax_query_attachments_args', array( $this, 'filter_media_modal' ) );
 	}
@@ -109,11 +112,19 @@ class WP_UserRights_Content_Filter {
 	// Kategorien beim Speichern erzwingen
 	// =========================================================================
 
+	/**
+	 * Klassischer Editor: save_post_post feuert nachdem wp_insert_post()
+	 * die Kategorien bereits gesetzt hat — Timing stimmt hier.
+	 */
 	public function enforce_category_on_save( $post_id, $post ) {
 		if ( defined( 'DOING_AUTOSAVE' ) && DOING_AUTOSAVE ) {
 			return;
 		}
 		if ( wp_is_post_revision( $post_id ) ) {
+			return;
+		}
+		// REST-Saves werden von rest_after_insert_post behandelt
+		if ( defined( 'REST_REQUEST' ) && REST_REQUEST ) {
 			return;
 		}
 
@@ -127,32 +138,63 @@ class WP_UserRights_Content_Filter {
 			return;
 		}
 
+		$this->enforce_allowed_categories( $post_id, $r['cats'] );
+	}
+
+	/**
+	 * Gutenberg / REST API: rest_after_insert_post feuert nachdem AUCH
+	 * handle_terms() die Kategorien gesetzt hat — einziger zuverlässiger
+	 * Zeitpunkt für REST-basierte Saves.
+	 *
+	 * @param WP_Post $post
+	 */
+	public function enforce_category_after_rest_save( $post ) {
+		$user = wp_get_current_user();
+		if ( ! $user->exists() || current_user_can( 'manage_options' ) ) {
+			return;
+		}
+
+		$r = $this->get_user_content_restrictions( $user );
+		if ( ! $r['restrict_cats'] ) {
+			return;
+		}
+
+		$this->enforce_allowed_categories( $post->ID, $r['cats'] );
+	}
+
+	/**
+	 * Korrigiert die Kategorie-Zuweisung eines Beitrags auf die erlaubten Slugs.
+	 *
+	 * @param int   $post_id
+	 * @param array $allowed_slugs
+	 */
+	private function enforce_allowed_categories( $post_id, array $allowed_slugs ) {
 		$current_terms = wp_get_post_terms( $post_id, 'category' );
 		if ( is_wp_error( $current_terms ) ) {
 			return;
 		}
 
-		// Nur erlaubte Kategorien behalten
 		$valid_ids = array();
 		foreach ( $current_terms as $term ) {
-			if ( in_array( $term->slug, $r['cats'], true ) ) {
+			if ( in_array( $term->slug, $allowed_slugs, true ) ) {
 				$valid_ids[] = $term->term_id;
 			}
 		}
 
-		// Keine erlaubte Kategorie gesetzt → erste erlaubte erzwingen
+		// Keine erlaubte Kategorie gesetzt → erste erlaubte als Fallback
 		if ( empty( $valid_ids ) ) {
-			$fallback = get_term_by( 'slug', $r['cats'][0], 'category' );
+			$fallback = get_term_by( 'slug', $allowed_slugs[0], 'category' );
 			if ( $fallback ) {
 				$valid_ids = array( $fallback->term_id );
 			}
 		}
 
 		if ( ! empty( $valid_ids ) ) {
-			// Hook temporär entfernen um Endlosschleifen zu verhindern
+			remove_action( 'rest_after_insert_post', array( $this, 'enforce_category_after_rest_save' ) );
 			remove_action( 'save_post_post', array( $this, 'enforce_category_on_save' ), 20 );
 			wp_set_post_terms( $post_id, $valid_ids, 'category' );
 			add_action( 'save_post_post', array( $this, 'enforce_category_on_save' ), 20, 2 );
+			add_action( 'rest_after_insert_post', array( $this, 'enforce_category_after_rest_save' ) );
 		}
 	}
 
