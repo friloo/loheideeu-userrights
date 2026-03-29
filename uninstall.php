@@ -31,3 +31,13 @@ foreach ( $permissions as $role_key => $role_data ) {
 
 // Plugin-Option aus der Datenbank entfernen
 delete_option( 'wp_userrights_permissions' );
+
+// Plugin-erstellte Rollen von allen Benutzern entfernen und Rollen-Definitionen löschen
+$managed_roles = (array) get_option( 'wp_userrights_managed_roles', array() );
+foreach ( $managed_roles as $role_slug ) {
+	foreach ( get_users( array( 'role' => $role_slug ) ) as $user ) {
+		$user->remove_role( $role_slug );
+	}
+	remove_role( $role_slug );
+}
+delete_option( 'wp_userrights_managed_roles' );

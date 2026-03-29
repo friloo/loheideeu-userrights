@@ -42,8 +42,10 @@ function wp_userrights_init() {
 	require_once WP_USERRIGHTS_DIR . 'includes/class-admin-menu.php';
 	require_once WP_USERRIGHTS_DIR . 'includes/class-settings.php';
 	require_once WP_USERRIGHTS_DIR . 'includes/class-content-filter.php';
+	require_once WP_USERRIGHTS_DIR . 'includes/class-role-manager.php';
 
 	new WP_UserRights_Admin_Menu();
 	new WP_UserRights_Settings();
 	new WP_UserRights_Content_Filter();
+	new WP_UserRights_Role_Manager();
 }

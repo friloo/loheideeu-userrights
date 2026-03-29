@@ -86,6 +86,17 @@ class WP_UserRights_Admin_Menu {
 			return;
 		}
 
+		// Reine Abonnenten komplett aus dem Backend aussperren (außer eigenem Profil)
+		$user_roles = array_values( (array) $user->roles );
+		sort( $user_roles );
+		if ( $user_roles === array( 'subscriber' ) ) {
+			if ( 'profile.php' !== $pagenow ) {
+				wp_safe_redirect( home_url() );
+				exit;
+			}
+			return;
+		}
+
 		$allowed_slugs = $this->get_allowed_slugs_for_user( $user );
 
 		if ( ! $this->is_current_page_allowed( $pagenow, $allowed_slugs ) ) {

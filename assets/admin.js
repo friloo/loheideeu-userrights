@@ -210,6 +210,59 @@
         updateAll();
 
         // --------------------------------------------------------------------
+        // Tab: Rollen – Slug-Autogenerierung aus dem Rollennamen
+        // --------------------------------------------------------------------
+        $('#wpur-role-name').on('input', function () {
+            var name = $(this).val();
+            var slug = name
+                .toLowerCase()
+                .replace(/ä/g, 'ae').replace(/ö/g, 'oe').replace(/ü/g, 'ue').replace(/ß/g, 'ss')
+                .replace(/[^a-z0-9]+/g, '-')
+                .replace(/^-+|-+$/g, '');
+            $('#wpur-role-slug').val(slug);
+        });
+
+        // --------------------------------------------------------------------
+        // Tab: Benutzer – AJAX-Toggle für Rollenzuweisungen
+        // --------------------------------------------------------------------
+        $(document).on('change', '.wpur-role-toggle', function () {
+            if (typeof wpurData === 'undefined') { return; }
+
+            var $cb     = $(this);
+            var userId  = $cb.data('user-id');
+            var role    = $cb.data('role');
+            var assigned= $cb.is(':checked');
+            var $status = $('#wpur-status-' + userId);
+
+            $status.removeClass('saved error').addClass('saving')
+                   .html('<span class="dashicons dashicons-update wpur-spin"></span> ' + escHtml(wpurData.saving));
+
+            $.post(wpurData.ajaxurl, {
+                action:   'wpur_toggle_user_role',
+                nonce:    wpurData.nonce,
+                user_id:  userId,
+                role:     role,
+                assigned: assigned ? '1' : '0'
+            })
+            .done(function (res) {
+                if (res.success) {
+                    $status.removeClass('saving error').addClass('saved')
+                           .html('<span class="dashicons dashicons-yes"></span> ' + escHtml(wpurData.saved));
+                    setTimeout(function () { $status.fadeOut(400, function () { $(this).html('').show(); }); }, 2000);
+                } else {
+                    $cb.prop('checked', !assigned); // Checkbox zurücksetzen
+                    $status.removeClass('saving saved').addClass('error')
+                           .html('<span class="dashicons dashicons-warning"></span> ' + escHtml(wpurData.error));
+                }
+            })
+            .fail(function () {
+                $cb.prop('checked', !assigned);
+                $status.removeClass('saving saved').addClass('error')
+                       .html('<span class="dashicons dashicons-warning"></span> ' + escHtml(wpurData.error));
+            });
+        });
+
+        // --------------------------------------------------------------------
         // Hilfsfunktion: HTML escapen
         // --------------------------------------------------------------------
         function escHtml(str) {

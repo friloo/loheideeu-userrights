@@ -1,6 +1,6 @@
 <?php
 /**
- * Admin-Einstellungsseite: Menüpunkte pro Rolle konfigurieren.
+ * Admin-Einstellungsseite: Menüpunkte, Rollen und Benutzerzuweisungen konfigurieren.
  */
 
 if ( ! defined( 'ABSPATH' ) ) {
@@ -10,7 +10,7 @@ if ( ! defined( 'ABSPATH' ) ) {
 class WP_UserRights_Settings {
 
 	public function __construct() {
-		add_action( 'admin_menu', array( $this, 'register_settings_page' ) );
+		add_action( 'admin_menu',            array( $this, 'register_settings_page' ) );
 		add_action( 'admin_enqueue_scripts', array( $this, 'enqueue_assets' ) );
 		add_action( 'admin_post_wp_userrights_save', array( $this, 'save_settings' ) );
 	}
@@ -44,17 +44,27 @@ class WP_UserRights_Settings {
 			WP_USERRIGHTS_VERSION,
 			true
 		);
+		// Daten für AJAX-Aufrufe (Benutzerverwaltung)
+		wp_localize_script( 'wp-userrights-admin', 'wpurData', array(
+			'ajaxurl' => admin_url( 'admin-ajax.php' ),
+			'nonce'   => wp_create_nonce( 'wpur_toggle_user_role' ),
+			'saving'  => __( 'Wird gespeichert …', 'wp-userrights' ),
+			'saved'   => __( 'Gespeichert', 'wp-userrights' ),
+			'error'   => __( 'Fehler beim Speichern', 'wp-userrights' ),
+		) );
 	}
+
+	// =========================================================================
+	// Hilfsmethoden
+	// =========================================================================
 
 	/**
 	 * Liest alle aktuell registrierten Menüpunkte aus den globalen Arrays.
-	 * Gibt strukturiertes Array zurück: [ ['slug' => '...', 'label' => '...', 'children' => [...]], ... ]
 	 */
 	public function get_menu_tree() {
 		global $menu, $submenu;
 
 		$tree = array();
-
 		if ( empty( $menu ) ) {
 			return $tree;
 		}
@@ -65,7 +75,6 @@ class WP_UserRights_Settings {
 			$slug  = $item[2];
 			$label = wp_strip_all_tags( $item[0] );
 
-			// Separatoren überspringen
 			if ( strpos( $slug, 'separator' ) === 0 || empty( $label ) ) {
 				continue;
 			}
@@ -81,14 +90,9 @@ class WP_UserRights_Settings {
 				foreach ( $submenu[ $slug ] as $sub ) {
 					$sub_slug  = $sub[2];
 					$sub_label = wp_strip_all_tags( $sub[0] );
-
-					if ( empty( $sub_label ) ) {
-						$sub_label = $sub_slug;
-					}
-
 					$node['children'][] = array(
 						'slug'  => $sub_slug,
-						'label' => $sub_label,
+						'label' => $sub_label ?: $sub_slug,
 						'cap'   => isset( $sub[1] ) ? $sub[1] : 'read',
 					);
 				}
@@ -100,38 +104,37 @@ class WP_UserRights_Settings {
 		return $tree;
 	}
 
-	/**
-	 * Gibt alle WordPress-Rollen außer administrator zurück.
-	 */
+	/** Gibt alle WordPress-Rollen außer administrator zurück. */
 	private function get_editable_roles() {
 		$all_roles = wp_roles()->roles;
 		unset( $all_roles['administrator'] );
 		return $all_roles;
 	}
 
+	// =========================================================================
+	// Haupt-Render: Plugin-Header + Tab-Navigation
+	// =========================================================================
+
 	public function render_page() {
 		if ( ! current_user_can( 'manage_options' ) ) {
 			return;
 		}
 
-		$roles       = $this->get_editable_roles();
-		$permissions = get_option( WP_USERRIGHTS_OPTION, array() );
-		$menu_tree   = $this->get_menu_tree();
-
-		// Aktive Rolle aus GET-Parameter oder erste verfügbare
-		$selected_role = isset( $_GET['role'] ) ? sanitize_key( $_GET['role'] ) : '';
-		if ( empty( $selected_role ) || ! isset( $roles[ $selected_role ] ) ) {
-			$selected_role = ! empty( $roles ) ? array_key_first( $roles ) : '';
-		}
-
-		$role_perms         = isset( $permissions[ $selected_role ] ) ? $permissions[ $selected_role ] : array();
-		$allowed_slugs      = isset( $role_perms['menu_slugs'] ) ? (array) $role_perms['menu_slugs'] : array();
-		$allowed_categories = isset( $role_perms['allowed_categories'] ) ? implode( ', ', (array) $role_perms['allowed_categories'] ) : '';
-		$allowed_pages      = isset( $role_perms['allowed_page_slugs'] ) ? implode( ', ', (array) $role_perms['allowed_page_slugs'] ) : '';
-
-		// WordPress-Standardrollen die bereits eingebaute Capabilities haben
-		$builtin_roles = array( 'editor', 'author', 'contributor', 'subscriber' );
-		$is_builtin    = in_array( $selected_role, $builtin_roles, true );
+		$current_tab = isset( $_GET['tab'] ) ? sanitize_key( $_GET['tab'] ) : 'permissions';
+		$tabs        = array(
+			'permissions' => array(
+				'label' => __( 'Berechtigungen', 'wp-userrights' ),
+				'icon'  => 'dashicons-admin-network',
+			),
+			'rollen'      => array(
+				'label' => __( 'Rollen verwalten', 'wp-userrights' ),
+				'icon'  => 'dashicons-shield-alt',
+			),
+			'benutzer'    => array(
+				'label' => __( 'Benutzer', 'wp-userrights' ),
+				'icon'  => 'dashicons-groups',
+			),
+		);
 		?>
 		<div class="wrap wp-userrights-wrap">
 
@@ -146,7 +149,7 @@ class WP_UserRights_Settings {
 						<a href="https://loheide.eu" target="_blank" rel="noopener">loheide.eu</a>
 					</p>
 				</div>
-				<?php if ( isset( $_GET['saved'] ) && '1' === $_GET['saved'] ) : ?>
+				<?php if ( 'permissions' === $current_tab && isset( $_GET['saved'] ) && '1' === $_GET['saved'] ) : ?>
 				<div class="wp-userrights-save-badge">
 					<span class="dashicons dashicons-yes"></span>
 					<?php esc_html_e( 'Gespeichert', 'wp-userrights' ); ?>
@@ -154,204 +157,459 @@ class WP_UserRights_Settings {
 				<?php endif; ?>
 			</div>
 
-			<?php if ( empty( $roles ) ) : ?>
-				<div class="notice notice-warning">
-					<p><?php esc_html_e( 'Keine bearbeitbaren Rollen gefunden (außer Administrator).', 'wp-userrights' ); ?></p>
-				</div>
-			<?php else : ?>
+			<!-- Tab-Navigation -->
+			<nav class="wp-userrights-tab-nav">
+				<?php foreach ( $tabs as $tab_key => $tab ) : ?>
+				<a href="<?php echo esc_url( add_query_arg( array( 'page' => 'wp-userrights', 'tab' => $tab_key ), admin_url( 'admin.php' ) ) ); ?>"
+					class="wpur-tab<?php echo $tab_key === $current_tab ? ' wpur-tab-active' : ''; ?>">
+					<span class="dashicons <?php echo esc_attr( $tab['icon'] ); ?>"></span>
+					<?php echo esc_html( $tab['label'] ); ?>
+				</a>
+				<?php endforeach; ?>
+			</nav>
 
-			<!-- Rollenauswahl -->
-			<div class="wp-userrights-role-selector">
-				<span class="role-selector-icon dashicons dashicons-groups"></span>
-				<label for="wp-userrights-role-select"><?php esc_html_e( 'Rolle:', 'wp-userrights' ); ?></label>
-				<select id="wp-userrights-role-select">
-					<?php foreach ( $roles as $role_key => $role_data ) : ?>
-						<option value="<?php echo esc_attr( $role_key ); ?>"
-							data-url="<?php echo esc_attr( add_query_arg( array( 'page' => 'wp-userrights', 'role' => $role_key ), admin_url( 'admin.php' ) ) ); ?>"
-							<?php selected( $selected_role, $role_key ); ?>>
-							<?php echo esc_html( translate_user_role( $role_data['name'] ) ); ?>
-						</option>
-					<?php endforeach; ?>
-				</select>
-				<?php if ( $is_builtin ) : ?>
-				<span class="role-badge role-badge-warning">
-					<span class="dashicons dashicons-warning"></span>
-					<?php esc_html_e( 'Standardrolle', 'wp-userrights' ); ?>
-				</span>
+			<!-- Tab-Inhalt -->
+			<?php
+			if ( 'rollen' === $current_tab ) {
+				$this->render_roles_tab();
+			} elseif ( 'benutzer' === $current_tab ) {
+				$this->render_users_tab();
+			} else {
+				$this->render_permissions_tab();
+			}
+			?>
+
+		</div>
+		<?php
+	}
+
+	// =========================================================================
+	// Tab 1: Berechtigungen
+	// =========================================================================
+
+	private function render_permissions_tab() {
+		$roles       = $this->get_editable_roles();
+		$permissions = get_option( WP_USERRIGHTS_OPTION, array() );
+		$menu_tree   = $this->get_menu_tree();
+
+		$selected_role = isset( $_GET['role'] ) ? sanitize_key( $_GET['role'] ) : '';
+		if ( empty( $selected_role ) || ! isset( $roles[ $selected_role ] ) ) {
+			$selected_role = ! empty( $roles ) ? array_key_first( $roles ) : '';
+		}
+
+		$role_perms         = isset( $permissions[ $selected_role ] ) ? $permissions[ $selected_role ] : array();
+		$allowed_slugs      = isset( $role_perms['menu_slugs'] ) ? (array) $role_perms['menu_slugs'] : array();
+		$allowed_categories = isset( $role_perms['allowed_categories'] ) ? implode( ', ', (array) $role_perms['allowed_categories'] ) : '';
+		$allowed_pages      = isset( $role_perms['allowed_page_slugs'] ) ? implode( ', ', (array) $role_perms['allowed_page_slugs'] ) : '';
+
+		$builtin_roles = array( 'editor', 'author', 'contributor', 'subscriber' );
+		$is_builtin    = in_array( $selected_role, $builtin_roles, true );
+
+		if ( empty( $roles ) ) : ?>
+			<div class="notice notice-warning"><p><?php esc_html_e( 'Keine bearbeitbaren Rollen gefunden (außer Administrator).', 'wp-userrights' ); ?></p></div>
+			<?php return;
+		endif;
+		?>
+
+		<!-- Rollenauswahl -->
+		<div class="wp-userrights-role-selector">
+			<span class="role-selector-icon dashicons dashicons-groups"></span>
+			<label for="wp-userrights-role-select"><?php esc_html_e( 'Rolle:', 'wp-userrights' ); ?></label>
+			<select id="wp-userrights-role-select">
+				<?php foreach ( $roles as $role_key => $role_data ) : ?>
+				<option value="<?php echo esc_attr( $role_key ); ?>"
+					data-url="<?php echo esc_attr( add_query_arg( array( 'page' => 'wp-userrights', 'tab' => 'permissions', 'role' => $role_key ), admin_url( 'admin.php' ) ) ); ?>"
+					<?php selected( $selected_role, $role_key ); ?>>
+					<?php echo esc_html( translate_user_role( $role_data['name'] ) ); ?>
+				</option>
+				<?php endforeach; ?>
+			</select>
+			<?php if ( $is_builtin ) : ?>
+			<span class="role-badge role-badge-warning"><span class="dashicons dashicons-warning"></span><?php esc_html_e( 'Standardrolle', 'wp-userrights' ); ?></span>
+			<?php else : ?>
+			<span class="role-badge role-badge-custom"><span class="dashicons dashicons-yes-alt"></span><?php esc_html_e( 'Eigene Rolle', 'wp-userrights' ); ?></span>
+			<?php endif; ?>
+		</div>
+
+		<?php if ( $is_builtin ) : ?>
+		<div class="notice notice-warning inline">
+			<p>
+				<strong><?php esc_html_e( 'Achtung: WordPress-Standardrolle', 'wp-userrights' ); ?></strong><br>
+				<?php printf(
+					/* translators: %s: role name */
+					esc_html__( 'Die Rolle „%s" ist eine eingebaute WordPress-Rolle mit vordefinierten Berechtigungen. Änderungen hier können das normale WordPress-Verhalten dieser Rolle beeinflussen. Es wird empfohlen, stattdessen eigene benutzerdefinierte Rollen zu verwenden.', 'wp-userrights' ),
+					esc_html( translate_user_role( $roles[ $selected_role ]['name'] ) )
+				); ?>
+			</p>
+		</div>
+		<?php endif; ?>
+
+		<form method="post" action="<?php echo esc_url( admin_url( 'admin-post.php' ) ); ?>" class="wp-userrights-form">
+			<?php wp_nonce_field( 'wp_userrights_save_' . $selected_role, 'wp_userrights_nonce' ); ?>
+			<input type="hidden" name="action" value="wp_userrights_save">
+			<input type="hidden" name="wp_userrights_role" value="<?php echo esc_attr( $selected_role ); ?>">
+
+			<div class="wp-userrights-section">
+				<h2>
+					<?php
+					$role_label = isset( $roles[ $selected_role ]['name'] ) ? translate_user_role( $roles[ $selected_role ]['name'] ) : $selected_role;
+					/* translators: %s: role name */
+					printf( esc_html__( 'Menürechte für Rolle: %s', 'wp-userrights' ), '<strong>' . esc_html( $role_label ) . '</strong>' );
+					?>
+				</h2>
+
+				<div class="wp-userrights-toolbar">
+					<div class="toolbar-left">
+						<button type="button" class="button wp-userrights-btn-check" id="wp-userrights-check-all">
+							<span class="dashicons dashicons-yes-alt"></span><?php esc_html_e( 'Alle', 'wp-userrights' ); ?>
+						</button>
+						<button type="button" class="button wp-userrights-btn-uncheck" id="wp-userrights-uncheck-all">
+							<span class="dashicons dashicons-dismiss"></span><?php esc_html_e( 'Keine', 'wp-userrights' ); ?>
+						</button>
+						<span id="wp-userrights-count" class="selection-count">
+							<span id="wp-userrights-count-num">0</span> <?php esc_html_e( 'ausgewählt', 'wp-userrights' ); ?>
+						</span>
+					</div>
+					<div class="toolbar-right">
+						<div class="wp-userrights-search-box">
+							<span class="dashicons dashicons-search"></span>
+							<input type="text" id="wp-userrights-search"
+								placeholder="<?php esc_attr_e( 'Menüpunkt suchen …', 'wp-userrights' ); ?>"
+								autocomplete="off">
+						</div>
+					</div>
+				</div>
+
+				<div id="wp-userrights-cap-preview" class="wp-userrights-cap-preview" style="display:none;">
+					<span class="dashicons dashicons-admin-network cap-preview-icon"></span>
+					<span class="cap-preview-label"><?php esc_html_e( 'WordPress-Capabilities:', 'wp-userrights' ); ?></span>
+					<span id="wp-userrights-cap-list" class="cap-preview-list"></span>
+				</div>
+
+				<?php if ( empty( $menu_tree ) ) : ?>
+					<p class="description"><?php esc_html_e( 'Keine Menüpunkte gefunden.', 'wp-userrights' ); ?></p>
 				<?php else : ?>
-				<span class="role-badge role-badge-custom">
-					<span class="dashicons dashicons-yes-alt"></span>
-					<?php esc_html_e( 'Eigene Rolle', 'wp-userrights' ); ?>
-				</span>
+				<div class="wp-userrights-menu-tree">
+					<?php foreach ( $menu_tree as $top_item ) : ?>
+					<div class="menu-item-top">
+						<input type="hidden" name="menu_cap_map[<?php echo esc_attr( $top_item['slug'] ); ?>]" value="<?php echo esc_attr( $top_item['cap'] ); ?>">
+						<label class="menu-item-label top-level">
+							<input type="checkbox" name="menu_slugs[]" value="<?php echo esc_attr( $top_item['slug'] ); ?>"
+								class="menu-checkbox top-level-checkbox"
+								<?php checked( in_array( $top_item['slug'], $allowed_slugs, true ) ); ?>>
+							<span class="dashicons dashicons-menu-alt"></span>
+							<?php echo esc_html( $top_item['label'] ); ?>
+							<code class="slug-hint"><?php echo esc_html( $top_item['slug'] ); ?></code>
+						</label>
+						<?php if ( ! empty( $top_item['children'] ) ) : ?>
+						<div class="submenu-items">
+							<?php foreach ( $top_item['children'] as $child ) : ?>
+							<input type="hidden" name="menu_parent_map[<?php echo esc_attr( $child['slug'] ); ?>]" value="<?php echo esc_attr( $top_item['slug'] ); ?>">
+							<input type="hidden" name="menu_cap_map[<?php echo esc_attr( $child['slug'] ); ?>]" value="<?php echo esc_attr( $child['cap'] ); ?>">
+							<label class="menu-item-label sub-level">
+								<input type="checkbox" name="menu_slugs[]" value="<?php echo esc_attr( $child['slug'] ); ?>"
+									class="menu-checkbox sub-level-checkbox"
+									data-parent="<?php echo esc_attr( $top_item['slug'] ); ?>"
+									<?php checked( in_array( $child['slug'], $allowed_slugs, true ) ); ?>>
+								<span class="dashicons dashicons-arrow-right-alt2"></span>
+								<?php echo esc_html( $child['label'] ); ?>
+								<code class="slug-hint"><?php echo esc_html( $child['slug'] ); ?></code>
+							</label>
+							<?php endforeach; ?>
+						</div>
+						<?php endif; ?>
+					</div>
+					<?php endforeach; ?>
+				</div>
 				<?php endif; ?>
 			</div>
 
-			<?php if ( $is_builtin ) : ?>
-			<div class="notice notice-warning inline">
-				<p>
-					<strong><?php esc_html_e( 'Achtung: WordPress-Standardrolle', 'wp-userrights' ); ?></strong><br>
-					<?php
-					printf(
-						/* translators: %s: role name */
-						esc_html__( 'Die Rolle „%s" ist eine eingebaute WordPress-Rolle mit vordefinierten Berechtigungen. Änderungen hier können das normale WordPress-Verhalten dieser Rolle beeinflussen. Es wird empfohlen, stattdessen eigene benutzerdefinierte Rollen zu verwenden.', 'wp-userrights' ),
-						esc_html( translate_user_role( $roles[ $selected_role ]['name'] ) )
-					);
-					?>
-				</p>
+			<!-- Inhaltsfilter -->
+			<div class="wp-userrights-section">
+				<h2><?php esc_html_e( 'Inhaltsfilter', 'wp-userrights' ); ?></h2>
+				<p class="description"><?php esc_html_e( 'Optional: Schränken Sie ein, welche Beiträge und Seiten diese Rolle sehen darf. Leer = alle sichtbar.', 'wp-userrights' ); ?></p>
+				<table class="form-table">
+					<tr>
+						<th scope="row"><label for="wp-userrights-categories"><?php esc_html_e( 'Nur Beiträge in Kategorien', 'wp-userrights' ); ?></label></th>
+						<td>
+							<input type="text" id="wp-userrights-categories" name="allowed_categories"
+								value="<?php echo esc_attr( $allowed_categories ); ?>" class="regular-text" placeholder="mav, aktuell">
+							<p class="description"><?php esc_html_e( 'Kategorie-Slugs, kommagetrennt.', 'wp-userrights' ); ?></p>
+						</td>
+					</tr>
+					<tr>
+						<th scope="row"><label for="wp-userrights-pages"><?php esc_html_e( 'Nur Seiten mit diesen Slugs', 'wp-userrights' ); ?></label></th>
+						<td>
+							<input type="text" id="wp-userrights-pages" name="allowed_page_slugs"
+								value="<?php echo esc_attr( $allowed_pages ); ?>" class="regular-text" placeholder="mav, kuenstlerteam">
+							<p class="description"><?php esc_html_e( 'Seiten-Slugs, kommagetrennt.', 'wp-userrights' ); ?></p>
+						</td>
+					</tr>
+				</table>
 			</div>
-			<?php endif; ?>
 
-			<!-- Formular für gewählte Rolle -->
-			<form method="post" action="<?php echo esc_url( admin_url( 'admin-post.php' ) ); ?>" class="wp-userrights-form">
-				<?php wp_nonce_field( 'wp_userrights_save_' . $selected_role, 'wp_userrights_nonce' ); ?>
-				<input type="hidden" name="action" value="wp_userrights_save">
-				<input type="hidden" name="wp_userrights_role" value="<?php echo esc_attr( $selected_role ); ?>">
+			<p class="submit">
+				<button type="submit" class="button button-primary"><?php esc_html_e( 'Einstellungen speichern', 'wp-userrights' ); ?></button>
+			</p>
+		</form>
+		<?php
+	}
 
-				<div class="wp-userrights-section">
-					<h2>
-						<?php
-						$role_label = isset( $roles[ $selected_role ]['name'] ) ? translate_user_role( $roles[ $selected_role ]['name'] ) : $selected_role;
-						/* translators: %s: role name */
-						printf( esc_html__( 'Menürechte für Rolle: %s', 'wp-userrights' ), '<strong>' . esc_html( $role_label ) . '</strong>' );
-						?>
-					</h2>
+	// =========================================================================
+	// Tab 2: Rollen verwalten
+	// =========================================================================
 
-					<div class="wp-userrights-toolbar">
-						<div class="toolbar-left">
-							<button type="button" class="button wp-userrights-btn-check" id="wp-userrights-check-all">
-								<span class="dashicons dashicons-yes-alt"></span>
-								<?php esc_html_e( 'Alle', 'wp-userrights' ); ?>
-							</button>
-							<button type="button" class="button wp-userrights-btn-uncheck" id="wp-userrights-uncheck-all">
-								<span class="dashicons dashicons-dismiss"></span>
-								<?php esc_html_e( 'Keine', 'wp-userrights' ); ?>
-							</button>
-							<span id="wp-userrights-count" class="selection-count">
-								<span id="wp-userrights-count-num">0</span>
-								<?php esc_html_e( 'ausgewählt', 'wp-userrights' ); ?>
-							</span>
-						</div>
-						<div class="toolbar-right">
-							<div class="wp-userrights-search-box">
-								<span class="dashicons dashicons-search"></span>
-								<input type="text" id="wp-userrights-search"
-									placeholder="<?php esc_attr_e( 'Menüpunkt suchen …', 'wp-userrights' ); ?>"
-									autocomplete="off">
-							</div>
-						</div>
-					</div>
+	private function render_roles_tab() {
+		$managed_roles = WP_UserRights_Role_Manager::get_managed_roles();
+		$all_roles     = wp_roles()->roles;
+		?>
 
-					<!-- Capability-Vorschau: wird per JavaScript aktualisiert -->
-					<div id="wp-userrights-cap-preview" class="wp-userrights-cap-preview" style="display:none;">
-						<span class="dashicons dashicons-admin-network cap-preview-icon"></span>
-						<span class="cap-preview-label"><?php esc_html_e( 'WordPress-Capabilities:', 'wp-userrights' ); ?></span>
-						<span id="wp-userrights-cap-list" class="cap-preview-list"></span>
-					</div>
+		<!-- Notices -->
+		<?php if ( isset( $_GET['role_created'] ) ) : ?>
+		<div class="notice notice-success is-dismissible"><p><?php esc_html_e( 'Rolle erfolgreich erstellt.', 'wp-userrights' ); ?></p></div>
+		<?php elseif ( isset( $_GET['role_deleted'] ) ) : ?>
+		<div class="notice notice-success is-dismissible"><p><?php esc_html_e( 'Rolle wurde gelöscht.', 'wp-userrights' ); ?></p></div>
+		<?php elseif ( isset( $_GET['role_error'] ) ) : ?>
+		<div class="notice notice-error is-dismissible">
+			<p>
+			<?php
+			$errors = array(
+				'empty'  => __( 'Bitte Name und Slug angeben.', 'wp-userrights' ),
+				'exists' => __( 'Eine Rolle mit diesem Slug existiert bereits.', 'wp-userrights' ),
+				'failed' => __( 'Die Rolle konnte nicht erstellt werden.', 'wp-userrights' ),
+			);
+			$code = sanitize_key( $_GET['role_error'] );
+			echo esc_html( isset( $errors[ $code ] ) ? $errors[ $code ] : __( 'Unbekannter Fehler.', 'wp-userrights' ) );
+			?>
+			</p>
+		</div>
+		<?php endif; ?>
 
-					<?php if ( empty( $menu_tree ) ) : ?>
-						<p class="description"><?php esc_html_e( 'Keine Menüpunkte gefunden. Das kann passieren, wenn die Seite noch im Aufbau ist.', 'wp-userrights' ); ?></p>
-					<?php else : ?>
-					<div class="wp-userrights-menu-tree">
-						<?php foreach ( $menu_tree as $top_item ) : ?>
-							<div class="menu-item-top">
-								<?php // Capability dieses Top-Level-Eintrags für automatische Capability-Zuweisung ?>
-								<input type="hidden"
-									name="menu_cap_map[<?php echo esc_attr( $top_item['slug'] ); ?>]"
-									value="<?php echo esc_attr( $top_item['cap'] ); ?>">
-								<label class="menu-item-label top-level">
-									<input type="checkbox"
-										name="menu_slugs[]"
-										value="<?php echo esc_attr( $top_item['slug'] ); ?>"
-										class="menu-checkbox top-level-checkbox"
-										<?php checked( in_array( $top_item['slug'], $allowed_slugs, true ) ); ?>>
-									<span class="dashicons dashicons-menu-alt"></span>
-									<?php echo esc_html( $top_item['label'] ); ?>
-									<code class="slug-hint"><?php echo esc_html( $top_item['slug'] ); ?></code>
-								</label>
-
-								<?php if ( ! empty( $top_item['children'] ) ) : ?>
-								<div class="submenu-items">
-									<?php foreach ( $top_item['children'] as $child ) : ?>
-									<?php // Eltern-Slug und Capability für dieses Kind (Auto-Include + Capability-Sync) ?>
-									<input type="hidden"
-										name="menu_parent_map[<?php echo esc_attr( $child['slug'] ); ?>]"
-										value="<?php echo esc_attr( $top_item['slug'] ); ?>">
-									<input type="hidden"
-										name="menu_cap_map[<?php echo esc_attr( $child['slug'] ); ?>]"
-										value="<?php echo esc_attr( $child['cap'] ); ?>">
-									<label class="menu-item-label sub-level">
-										<input type="checkbox"
-											name="menu_slugs[]"
-											value="<?php echo esc_attr( $child['slug'] ); ?>"
-											class="menu-checkbox sub-level-checkbox"
-											data-parent="<?php echo esc_attr( $top_item['slug'] ); ?>"
-											<?php checked( in_array( $child['slug'], $allowed_slugs, true ) ); ?>>
-										<span class="dashicons dashicons-arrow-right-alt2"></span>
-										<?php echo esc_html( $child['label'] ); ?>
-										<code class="slug-hint"><?php echo esc_html( $child['slug'] ); ?></code>
-									</label>
-									<?php endforeach; ?>
-								</div>
-								<?php endif; ?>
-							</div>
-						<?php endforeach; ?>
-					</div>
-					<?php endif; ?>
-				</div>
-
-				<!-- Inhaltsfilter -->
-				<div class="wp-userrights-section">
-					<h2><?php esc_html_e( 'Inhaltsfilter', 'wp-userrights' ); ?></h2>
-					<p class="description">
-						<?php esc_html_e( 'Optional: Schränken Sie ein, welche Beiträge und Seiten diese Rolle in der Admin-Liste sehen darf. Leer lassen = alle sichtbar (sofern Menüzugriff besteht).', 'wp-userrights' ); ?>
-					</p>
-					<table class="form-table">
-						<tr>
-							<th scope="row">
-								<label for="wp-userrights-categories">
-									<?php esc_html_e( 'Nur Beiträge in Kategorien', 'wp-userrights' ); ?>
-								</label>
-							</th>
-							<td>
-								<input type="text"
-									id="wp-userrights-categories"
-									name="allowed_categories"
-									value="<?php echo esc_attr( $allowed_categories ); ?>"
-									class="regular-text"
-									placeholder="mav, aktuell">
-								<p class="description"><?php esc_html_e( 'Kategorie-Slugs, kommagetrennt. Leer = alle Kategorien.', 'wp-userrights' ); ?></p>
-							</td>
-						</tr>
-						<tr>
-							<th scope="row">
-								<label for="wp-userrights-pages">
-									<?php esc_html_e( 'Nur Seiten mit diesen Slugs', 'wp-userrights' ); ?>
-								</label>
-							</th>
-							<td>
-								<input type="text"
-									id="wp-userrights-pages"
-									name="allowed_page_slugs"
-									value="<?php echo esc_attr( $allowed_pages ); ?>"
-									class="regular-text"
-									placeholder="mav, kuenstlerteam">
-								<p class="description"><?php esc_html_e( 'Seiten-Slugs, kommagetrennt. Leer = alle Seiten.', 'wp-userrights' ); ?></p>
-							</td>
-						</tr>
-					</table>
-				</div>
-
+		<!-- Neue Rolle erstellen -->
+		<div class="wp-userrights-section">
+			<h2><span class="dashicons dashicons-plus-alt2"></span> <?php esc_html_e( 'Neue Rolle erstellen', 'wp-userrights' ); ?></h2>
+			<form method="post" action="<?php echo esc_url( admin_url( 'admin-post.php' ) ); ?>">
+				<?php wp_nonce_field( 'wpur_create_role', 'wpur_nonce' ); ?>
+				<input type="hidden" name="action" value="wpur_create_role">
+				<table class="form-table">
+					<tr>
+						<th scope="row"><label for="wpur-role-name"><?php esc_html_e( 'Rollenname', 'wp-userrights' ); ?></label></th>
+						<td>
+							<input type="text" id="wpur-role-name" name="role_name" class="regular-text"
+								placeholder="<?php esc_attr_e( 'z. B. MAV', 'wp-userrights' ); ?>" required>
+						</td>
+					</tr>
+					<tr>
+						<th scope="row"><label for="wpur-role-slug"><?php esc_html_e( 'Rollen-ID (Slug)', 'wp-userrights' ); ?></label></th>
+						<td>
+							<input type="text" id="wpur-role-slug" name="role_slug" class="regular-text"
+								placeholder="<?php esc_attr_e( 'mav', 'wp-userrights' ); ?>" required
+								pattern="[a-z0-9_\-]+" title="<?php esc_attr_e( 'Nur Kleinbuchstaben, Zahlen, Bindestriche und Unterstriche.', 'wp-userrights' ); ?>">
+							<p class="description"><?php esc_html_e( 'Kleinbuchstaben, keine Sonderzeichen. Kann nach dem Erstellen nicht geändert werden.', 'wp-userrights' ); ?></p>
+						</td>
+					</tr>
+				</table>
 				<p class="submit">
 					<button type="submit" class="button button-primary">
-						<?php esc_html_e( 'Einstellungen speichern', 'wp-userrights' ); ?>
+						<span class="dashicons dashicons-plus-alt2"></span>
+						<?php esc_html_e( 'Rolle erstellen', 'wp-userrights' ); ?>
 					</button>
 				</p>
 			</form>
+		</div>
 
+		<!-- Verwaltete Rollen -->
+		<div class="wp-userrights-section">
+			<h2><span class="dashicons dashicons-shield-alt"></span> <?php esc_html_e( 'Von diesem Plugin verwaltete Rollen', 'wp-userrights' ); ?></h2>
+
+			<?php if ( empty( $managed_roles ) ) : ?>
+			<p class="wpur-empty-state">
+				<span class="dashicons dashicons-info"></span>
+				<?php esc_html_e( 'Noch keine eigenen Rollen erstellt. Nutzen Sie das Formular oben um Ihre erste Rolle anzulegen.', 'wp-userrights' ); ?>
+			</p>
+			<?php else : ?>
+			<table class="wp-list-table widefat fixed striped wpur-roles-table">
+				<thead>
+					<tr>
+						<th><?php esc_html_e( 'Rollenname', 'wp-userrights' ); ?></th>
+						<th><?php esc_html_e( 'Rollen-ID', 'wp-userrights' ); ?></th>
+						<th><?php esc_html_e( 'Zugewiesene Benutzer', 'wp-userrights' ); ?></th>
+						<th><?php esc_html_e( 'Berechtigungen', 'wp-userrights' ); ?></th>
+						<th><?php esc_html_e( 'Aktionen', 'wp-userrights' ); ?></th>
+					</tr>
+				</thead>
+				<tbody>
+					<?php foreach ( $managed_roles as $role_slug ) :
+						if ( ! isset( $all_roles[ $role_slug ] ) ) continue;
+						$role_name   = translate_user_role( $all_roles[ $role_slug ]['name'] );
+						$user_count  = count( get_users( array( 'role' => $role_slug, 'fields' => 'ID' ) ) );
+						$permissions = get_option( WP_USERRIGHTS_OPTION, array() );
+						$slug_count  = isset( $permissions[ $role_slug ]['menu_slugs'] ) ? count( $permissions[ $role_slug ]['menu_slugs'] ) : 0;
+					?>
+					<tr>
+						<td><strong><?php echo esc_html( $role_name ); ?></strong></td>
+						<td><code><?php echo esc_html( $role_slug ); ?></code></td>
+						<td>
+							<span class="wpur-count-badge"><?php echo esc_html( $user_count ); ?></span>
+						</td>
+						<td>
+							<?php if ( $slug_count > 0 ) : ?>
+							<a href="<?php echo esc_url( add_query_arg( array( 'page' => 'wp-userrights', 'tab' => 'permissions', 'role' => $role_slug ), admin_url( 'admin.php' ) ) ); ?>">
+								<?php printf( esc_html( _n( '%d Menüpunkt', '%d Menüpunkte', $slug_count, 'wp-userrights' ) ), $slug_count ); ?>
+							</a>
+							<?php else : ?>
+							<span class="wpur-no-perms"><?php esc_html_e( 'Keine konfiguriert', 'wp-userrights' ); ?></span>
+							<?php endif; ?>
+						</td>
+						<td>
+							<a href="<?php echo esc_url( add_query_arg( array( 'page' => 'wp-userrights', 'tab' => 'permissions', 'role' => $role_slug ), admin_url( 'admin.php' ) ) ); ?>"
+								class="button button-small">
+								<span class="dashicons dashicons-edit"></span> <?php esc_html_e( 'Bearbeiten', 'wp-userrights' ); ?>
+							</a>
+							<form method="post" action="<?php echo esc_url( admin_url( 'admin-post.php' ) ); ?>" class="wpur-delete-form">
+								<?php wp_nonce_field( 'wpur_delete_role', 'wpur_nonce' ); ?>
+								<input type="hidden" name="action" value="wpur_delete_role">
+								<input type="hidden" name="role_slug" value="<?php echo esc_attr( $role_slug ); ?>">
+								<button type="submit" class="button button-small wpur-btn-delete"
+									onclick="return confirm('<?php printf( esc_attr__( 'Rolle „%s" wirklich löschen? Alle Benutzerzuweisungen werden entfernt.', 'wp-userrights' ), esc_attr( $role_name ) ); ?>')">
+									<span class="dashicons dashicons-trash"></span> <?php esc_html_e( 'Löschen', 'wp-userrights' ); ?>
+								</button>
+							</form>
+						</td>
+					</tr>
+					<?php endforeach; ?>
+				</tbody>
+			</table>
 			<?php endif; ?>
 		</div>
 		<?php
 	}
+
+	// =========================================================================
+	// Tab 3: Benutzer
+	// =========================================================================
+
+	private function render_users_tab() {
+		$managed_roles = WP_UserRights_Role_Manager::get_managed_roles();
+		$all_roles     = wp_roles()->roles;
+		?>
+
+		<?php if ( empty( $managed_roles ) ) : ?>
+		<div class="wp-userrights-section">
+			<p class="wpur-empty-state">
+				<span class="dashicons dashicons-info"></span>
+				<?php esc_html_e( 'Zuerst eigene Rollen unter „Rollen verwalten" erstellen, bevor Benutzern Rollen zugewiesen werden können.', 'wp-userrights' ); ?>
+				<a href="<?php echo esc_url( add_query_arg( array( 'page' => 'wp-userrights', 'tab' => 'rollen' ), admin_url( 'admin.php' ) ) ); ?>"
+					class="button button-small" style="margin-left:10px;">
+					<?php esc_html_e( 'Zur Rollenverwaltung', 'wp-userrights' ); ?>
+				</a>
+			</p>
+		</div>
+		<?php return; endif;
+
+		// Alle Benutzer außer Admins laden
+		$users = get_users( array(
+			'role__not_in' => array( 'administrator' ),
+			'orderby'      => 'display_name',
+			'order'        => 'ASC',
+			'number'       => 200,
+		) );
+		?>
+
+		<div class="wp-userrights-section">
+			<h2>
+				<span class="dashicons dashicons-groups"></span>
+				<?php esc_html_e( 'Rollen zuweisen', 'wp-userrights' ); ?>
+				<span class="wpur-count-badge" style="margin-left:8px;"><?php echo count( $users ); ?></span>
+			</h2>
+			<p class="description">
+				<?php esc_html_e( 'Weisen Sie Benutzern zusätzlich zu ihrer Basis-Rolle eine eigene Rolle zu. Die Zuweisung erfolgt sofort — kein Speichern nötig.', 'wp-userrights' ); ?>
+			</p>
+
+			<?php if ( empty( $users ) ) : ?>
+			<p class="wpur-empty-state">
+				<span class="dashicons dashicons-info"></span>
+				<?php esc_html_e( 'Keine Benutzer gefunden.', 'wp-userrights' ); ?>
+			</p>
+			<?php else : ?>
+			<div class="wpur-user-table-wrap">
+				<table class="wp-list-table widefat fixed striped wpur-user-table">
+					<thead>
+						<tr>
+							<th class="col-user"><?php esc_html_e( 'Benutzer', 'wp-userrights' ); ?></th>
+							<th class="col-base-role"><?php esc_html_e( 'Basis-Rolle', 'wp-userrights' ); ?></th>
+							<?php foreach ( $managed_roles as $role_slug ) :
+								if ( ! isset( $all_roles[ $role_slug ] ) ) continue;
+							?>
+							<th class="col-role"><?php echo esc_html( translate_user_role( $all_roles[ $role_slug ]['name'] ) ); ?></th>
+							<?php endforeach; ?>
+							<th class="col-status"><?php esc_html_e( 'Status', 'wp-userrights' ); ?></th>
+						</tr>
+					</thead>
+					<tbody>
+						<?php foreach ( $users as $user ) :
+							$user_roles  = (array) $user->roles;
+							$base_roles  = array_diff( $user_roles, $managed_roles );
+							$base_labels = array();
+							foreach ( $base_roles as $br ) {
+								$base_labels[] = isset( $all_roles[ $br ] ) ? translate_user_role( $all_roles[ $br ]['name'] ) : $br;
+							}
+							$is_subscriber_only = ( $user_roles === array( 'subscriber' ) );
+						?>
+						<tr data-user-id="<?php echo esc_attr( $user->ID ); ?>">
+							<td class="col-user">
+								<div class="wpur-user-info">
+									<?php echo get_avatar( $user->ID, 28, '', '', array( 'class' => 'wpur-avatar' ) ); ?>
+									<div>
+										<strong><?php echo esc_html( $user->display_name ); ?></strong>
+										<br><small class="wpur-email"><?php echo esc_html( $user->user_email ); ?></small>
+									</div>
+								</div>
+							</td>
+							<td class="col-base-role">
+								<?php if ( ! empty( $base_labels ) ) : ?>
+								<span class="wpur-base-role-badge"><?php echo esc_html( implode( ', ', $base_labels ) ); ?></span>
+								<?php if ( $is_subscriber_only ) : ?>
+								<br><small class="wpur-subscriber-hint">
+									<span class="dashicons dashicons-lock"></span>
+									<?php esc_html_e( 'Kein Backend-Zugriff', 'wp-userrights' ); ?>
+								</small>
+								<?php endif; ?>
+								<?php else : ?>
+								<span class="wpur-text-muted"><?php esc_html_e( '(keine)', 'wp-userrights' ); ?></span>
+								<?php endif; ?>
+							</td>
+							<?php foreach ( $managed_roles as $role_slug ) :
+								if ( ! isset( $all_roles[ $role_slug ] ) ) continue;
+								$has_role = in_array( $role_slug, $user_roles, true );
+							?>
+							<td class="col-role">
+								<label class="wpur-toggle-wrap" title="<?php echo esc_attr( translate_user_role( $all_roles[ $role_slug ]['name'] ) ); ?>">
+									<input type="checkbox"
+										class="wpur-role-toggle"
+										data-user-id="<?php echo esc_attr( $user->ID ); ?>"
+										data-role="<?php echo esc_attr( $role_slug ); ?>"
+										<?php checked( $has_role ); ?>>
+									<span class="wpur-toggle-slider"></span>
+								</label>
+							</td>
+							<?php endforeach; ?>
+							<td class="col-status">
+								<span class="wpur-save-status" id="wpur-status-<?php echo esc_attr( $user->ID ); ?>"></span>
+							</td>
+						</tr>
+						<?php endforeach; ?>
+					</tbody>
+				</table>
+			</div>
+			<?php endif; ?>
+		</div>
+		<?php
+	}
+
+	// =========================================================================
+	// Berechtigungen speichern (Permissions Tab)
+	// =========================================================================
 
 	public function save_settings() {
 		if ( ! current_user_can( 'manage_options' ) ) {
@@ -380,8 +638,7 @@ class WP_UserRights_Settings {
 		$raw_slugs   = isset( $_POST['menu_slugs'] ) ? (array) $_POST['menu_slugs'] : array();
 		$clean_slugs = array_values( array_filter( array_map( 'sanitize_text_field', $raw_slugs ) ) );
 
-		// Punkt 2: Eltern-Slug automatisch miteinschließen wenn ein Kind erlaubt ist.
-		// Das parent_map kommt als hidden input aus dem Formular: menu_parent_map[child] = parent
+		// Eltern-Slug automatisch miteinschließen
 		$parent_map = isset( $_POST['menu_parent_map'] ) ? (array) $_POST['menu_parent_map'] : array();
 		foreach ( $clean_slugs as $slug ) {
 			if ( isset( $parent_map[ $slug ] ) ) {
@@ -400,7 +657,7 @@ class WP_UserRights_Settings {
 		$raw_pages   = isset( $_POST['allowed_page_slugs'] ) ? sanitize_text_field( $_POST['allowed_page_slugs'] ) : '';
 		$clean_pages = array_values( array_filter( array_map( 'sanitize_title', explode( ',', $raw_pages ) ) ) );
 
-		// Punkt 1: Capability-Map aus dem Formular lesen und Capabilities der Rolle synchronisieren
+		// Capability-Synchronisierung
 		$raw_cap_map   = isset( $_POST['menu_cap_map'] ) ? (array) $_POST['menu_cap_map'] : array();
 		$clean_cap_map = array();
 		foreach ( $raw_cap_map as $s => $c ) {
@@ -418,30 +675,15 @@ class WP_UserRights_Settings {
 
 		update_option( WP_USERRIGHTS_OPTION, $permissions );
 
-		wp_safe_redirect(
-			add_query_arg(
-				array(
-					'page'  => 'wp-userrights',
-					'role'  => $role,
-					'saved' => '1',
-				),
-				admin_url( 'admin.php' )
-			)
-		);
+		wp_safe_redirect( add_query_arg(
+			array( 'page' => 'wp-userrights', 'tab' => 'permissions', 'role' => $role, 'saved' => '1' ),
+			admin_url( 'admin.php' )
+		) );
 		exit;
 	}
 
 	/**
-	 * Synchronisiert die WordPress-Capabilities einer Rolle mit den erlaubten Menüpunkten.
-	 *
-	 * - Fügt benötigte Capabilities hinzu (nur solche, die durch dieses Plugin vergeben werden)
-	 * - Entfernt zuvor von diesem Plugin vergebene Capabilities, die nicht mehr benötigt werden
-	 * - Capabilities die die Rolle bereits vor der Plugin-Verwaltung hatte, werden nie entfernt
-	 *
-	 * @param string $role_key   Rollen-Schlüssel
-	 * @param array  $new_slugs  Aktuell erlaubte Menü-Slugs
-	 * @param array  $cap_map    Zuordnung Slug → benötigte Capability (aus Formular)
-	 * @return array             Liste der jetzt durch dieses Plugin verwalteten Capabilities
+	 * Synchronisiert WordPress-Capabilities einer Rolle mit den erlaubten Menüpunkten.
 	 */
 	private function sync_role_capabilities( $role_key, array $new_slugs, array $cap_map ) {
 		$role_obj = get_role( $role_key );
@@ -454,20 +696,17 @@ class WP_UserRights_Settings {
 			? (array) $permissions[ $role_key ]['managed_caps']
 			: array();
 
-		// Capabilities berechnen die die neuen Slugs benötigen
 		$needed_caps = array();
 		foreach ( $new_slugs as $slug ) {
 			if ( ! empty( $cap_map[ $slug ] ) ) {
 				$needed_caps[] = $cap_map[ $slug ];
 			}
 		}
-		// 'read' ist für jeden Backend-Zugang nötig
 		if ( ! empty( $new_slugs ) ) {
 			$needed_caps[] = 'read';
 		}
 		$needed_caps = array_values( array_unique( $needed_caps ) );
 
-		// Neue Capabilities hinzufügen und in managed_caps aufnehmen
 		foreach ( $needed_caps as $cap ) {
 			$role_obj->add_cap( $cap, true );
 			if ( ! in_array( $cap, $managed_caps, true ) ) {
@@ -475,9 +714,7 @@ class WP_UserRights_Settings {
 			}
 		}
 
-		// Capabilities entfernen die wir früher hinzugefügt haben, aber jetzt nicht mehr brauchen
-		$caps_to_remove = array_diff( $managed_caps, $needed_caps );
-		foreach ( $caps_to_remove as $cap ) {
+		foreach ( array_diff( $managed_caps, $needed_caps ) as $cap ) {
 			$role_obj->remove_cap( $cap );
 		}
 
