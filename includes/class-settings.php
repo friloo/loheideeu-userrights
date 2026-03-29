@@ -694,7 +694,7 @@ class WP_UserRights_Settings {
 				</div>
 
 				<div class="wpur-user-table-wrap">
-					<table class="wp-list-table widefat fixed striped wpur-user-table">
+					<table class="wp-list-table widefat striped wpur-user-table">
 						<thead>
 							<tr>
 								<th class="col-check">
@@ -702,12 +702,7 @@ class WP_UserRights_Settings {
 								</th>
 								<th class="col-user"><?php esc_html_e( 'Benutzer', 'wp-userrights' ); ?></th>
 								<th class="col-base-role"><?php esc_html_e( 'Basis-Rolle', 'wp-userrights' ); ?></th>
-								<?php foreach ( $managed_roles as $role_slug ) :
-									if ( ! isset( $all_roles[ $role_slug ] ) ) continue;
-								?>
-								<th class="col-role"><?php echo esc_html( translate_user_role( $all_roles[ $role_slug ]['name'] ) ); ?></th>
-								<?php endforeach; ?>
-								<th class="col-status"><?php esc_html_e( 'Status', 'wp-userrights' ); ?></th>
+								<th class="col-roles"><?php esc_html_e( 'Plugin-Rollen', 'wp-userrights' ); ?></th>
 							</tr>
 						</thead>
 						<tbody>
@@ -719,6 +714,10 @@ class WP_UserRights_Settings {
 									$base_labels[] = isset( $all_roles[ $br ] ) ? translate_user_role( $all_roles[ $br ]['name'] ) : $br;
 								}
 								$is_subscriber_only = ( $user_roles === array( 'subscriber' ) );
+								// Unzugewiesene verwaltete Rollen für das Dropdown
+								$unassigned_roles = array_filter( $managed_roles, function( $rs ) use ( $user_roles, $all_roles ) {
+									return ! in_array( $rs, $user_roles, true ) && isset( $all_roles[ $rs ] );
+								} );
 							?>
 							<tr data-user-id="<?php echo esc_attr( $user->ID ); ?>">
 								<td class="col-check">
@@ -748,23 +747,40 @@ class WP_UserRights_Settings {
 									<span class="wpur-text-muted"><?php esc_html_e( '(keine)', 'wp-userrights' ); ?></span>
 									<?php endif; ?>
 								</td>
-								<?php foreach ( $managed_roles as $role_slug ) :
-									if ( ! isset( $all_roles[ $role_slug ] ) ) continue;
-									$has_role = in_array( $role_slug, $user_roles, true );
-								?>
-								<td class="col-role">
-									<label class="wpur-toggle-wrap" title="<?php echo esc_attr( translate_user_role( $all_roles[ $role_slug ]['name'] ) ); ?>">
-										<input type="checkbox"
-											class="wpur-role-toggle"
-											data-user-id="<?php echo esc_attr( $user->ID ); ?>"
-											data-role="<?php echo esc_attr( $role_slug ); ?>"
-											<?php checked( $has_role ); ?>>
-										<span class="wpur-toggle-slider"></span>
-									</label>
-								</td>
-								<?php endforeach; ?>
-								<td class="col-status">
-									<span class="wpur-save-status" id="wpur-status-<?php echo esc_attr( $user->ID ); ?>"></span>
+								<td class="col-roles">
+									<div class="wpur-role-chips" data-user-id="<?php echo esc_attr( $user->ID ); ?>">
+										<?php foreach ( $managed_roles as $role_slug ) :
+											if ( ! isset( $all_roles[ $role_slug ] ) ) continue;
+											if ( ! in_array( $role_slug, $user_roles, true ) ) continue;
+											$chip_label = esc_html( translate_user_role( $all_roles[ $role_slug ]['name'] ) );
+										?>
+										<span class="wpur-chip" data-role="<?php echo esc_attr( $role_slug ); ?>">
+											<?php echo $chip_label; ?>
+											<button type="button" class="wpur-chip-remove"
+												data-user-id="<?php echo esc_attr( $user->ID ); ?>"
+												data-role="<?php echo esc_attr( $role_slug ); ?>"
+												title="<?php esc_attr_e( 'Entfernen', 'wp-userrights' ); ?>">×</button>
+										</span>
+										<?php endforeach; ?>
+
+										<?php if ( ! empty( $unassigned_roles ) ) : ?>
+										<div class="wpur-add-role-wrap">
+											<button type="button" class="wpur-add-role-btn"
+												title="<?php esc_attr_e( 'Rolle hinzufügen', 'wp-userrights' ); ?>">
+												<span class="dashicons dashicons-plus-alt2"></span>
+											</button>
+											<div class="wpur-role-dropdown">
+												<?php foreach ( $unassigned_roles as $role_slug ) : ?>
+												<button type="button" class="wpur-role-option"
+													data-user-id="<?php echo esc_attr( $user->ID ); ?>"
+													data-role="<?php echo esc_attr( $role_slug ); ?>">
+													<?php echo esc_html( translate_user_role( $all_roles[ $role_slug ]['name'] ) ); ?>
+												</button>
+												<?php endforeach; ?>
+											</div>
+										</div>
+										<?php endif; ?>
+									</div>
 								</td>
 							</tr>
 							<?php endforeach; ?>

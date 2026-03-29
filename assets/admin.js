@@ -273,42 +273,117 @@
         });
 
         // --------------------------------------------------------------------
-        // Tab: Benutzer – AJAX-Toggle für Rollenzuweisungen
+        // Tab: Benutzer – Chip-Dropdown öffnen/schließen
         // --------------------------------------------------------------------
-        $(document).on('change', '.wpur-role-toggle', function () {
+        $(document).on('click', '.wpur-add-role-btn', function (e) {
+            e.stopPropagation();
+            var $dropdown = $(this).siblings('.wpur-role-dropdown');
+            var isOpen = $dropdown.hasClass('wpur-dropdown-open');
+            // Alle anderen schließen
+            $('.wpur-role-dropdown.wpur-dropdown-open').removeClass('wpur-dropdown-open');
+            if (!isOpen) {
+                $dropdown.addClass('wpur-dropdown-open');
+            }
+        });
+
+        // Außerhalb klicken → alle Dropdowns schließen
+        $(document).on('click', function () {
+            $('.wpur-role-dropdown.wpur-dropdown-open').removeClass('wpur-dropdown-open');
+        });
+
+        $(document).on('click', '.wpur-role-dropdown', function (e) {
+            e.stopPropagation();
+        });
+
+        // --------------------------------------------------------------------
+        // Tab: Benutzer – Rolle hinzufügen (Chip erstellen)
+        // --------------------------------------------------------------------
+        $(document).on('click', '.wpur-role-option', function () {
             if (typeof wpurData === 'undefined') { return; }
 
-            var $cb     = $(this);
-            var userId  = $cb.data('user-id');
-            var role    = $cb.data('role');
-            var assigned= $cb.is(':checked');
-            var $status = $('#wpur-status-' + userId);
+            var $btn    = $(this);
+            var userId  = $btn.data('user-id');
+            var role    = $btn.data('role');
+            var roleName = $btn.text();
+            var $chips  = $btn.closest('.wpur-role-chips');
 
-            $status.removeClass('saved error').addClass('saving')
-                   .html('<span class="dashicons dashicons-update wpur-spin"></span> ' + escHtml(wpurData.saving));
+            // Dropdown schließen
+            $btn.closest('.wpur-role-dropdown').removeClass('wpur-dropdown-open');
+
+            // Saving-Indicator einfügen
+            var $saving = $('<span class="wpur-chip-saving"><span class="dashicons dashicons-update wpur-spin"></span></span>').insertBefore($chips.find('.wpur-add-role-wrap'));
 
             $.post(wpurData.ajaxurl, {
                 action:   'wpur_toggle_user_role',
                 nonce:    wpurData.nonce,
                 user_id:  userId,
                 role:     role,
-                assigned: assigned ? '1' : '0'
+                assigned: '1'
             })
             .done(function (res) {
+                $saving.remove();
                 if (res.success) {
-                    $status.removeClass('saving error').addClass('saved')
-                           .html('<span class="dashicons dashicons-yes"></span> ' + escHtml(wpurData.saved));
-                    setTimeout(function () { $status.fadeOut(400, function () { $(this).html('').show(); }); }, 2000);
+                    // Chip einfügen
+                    var $chip = $(
+                        '<span class="wpur-chip" data-role="' + escHtml(role) + '">' +
+                            escHtml(roleName) +
+                            '<button type="button" class="wpur-chip-remove" data-user-id="' + escHtml(String(userId)) + '" data-role="' + escHtml(role) + '">&times;</button>' +
+                        '</span>'
+                    );
+                    $chip.insertBefore($chips.find('.wpur-add-role-wrap'));
+                    // Option aus Dropdown entfernen
+                    $btn.remove();
                 } else {
-                    $cb.prop('checked', !assigned); // Checkbox zurücksetzen
-                    $status.removeClass('saving saved').addClass('error')
-                           .html('<span class="dashicons dashicons-warning"></span> ' + escHtml(wpurData.error));
+                    alert(wpurData.error);
                 }
             })
             .fail(function () {
-                $cb.prop('checked', !assigned);
-                $status.removeClass('saving saved').addClass('error')
-                       .html('<span class="dashicons dashicons-warning"></span> ' + escHtml(wpurData.error));
+                $saving.remove();
+                alert(wpurData.error);
+            });
+        });
+
+        // --------------------------------------------------------------------
+        // Tab: Benutzer – Rolle entfernen (Chip löschen)
+        // --------------------------------------------------------------------
+        $(document).on('click', '.wpur-chip-remove', function () {
+            if (typeof wpurData === 'undefined') { return; }
+
+            var $btn    = $(this);
+            var $chip   = $btn.closest('.wpur-chip');
+            var userId  = $btn.data('user-id');
+            var role    = $btn.data('role');
+            var roleName = $chip.clone().children().remove().end().text().trim();
+            var $chips  = $chip.closest('.wpur-role-chips');
+
+            // Visuelles Feedback
+            $chip.css('opacity', '0.5');
+
+            $.post(wpurData.ajaxurl, {
+                action:   'wpur_toggle_user_role',
+                nonce:    wpurData.nonce,
+                user_id:  userId,
+                role:     role,
+                assigned: '0'
+            })
+            .done(function (res) {
+                if (res.success) {
+                    $chip.remove();
+                    // Option wieder ins Dropdown einfügen
+                    var $option = $(
+                        '<button type="button" class="wpur-role-option" data-user-id="' + escHtml(String(userId)) + '" data-role="' + escHtml(role) + '">' +
+                            escHtml(roleName) +
+                        '</button>'
+                    );
+                    $chips.find('.wpur-role-dropdown').append($option);
+                } else {
+                    $chip.css('opacity', '1');
+                    alert(wpurData.error);
+                }
+            })
+            .fail(function () {
+                $chip.css('opacity', '1');
+                alert(wpurData.error);
             });
         });
 
