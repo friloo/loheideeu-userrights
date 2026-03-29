@@ -19,8 +19,8 @@ class WP_UserRights_Admin_Menu {
 		add_action( 'admin_notices', array( $this, 'show_access_denied_notice' ) );
 		// Login-Weiterleitung: direkt zur ersten erlaubten Seite
 		add_filter( 'login_redirect', array( $this, 'login_redirect' ), 10, 3 );
-		// Admin-Bar im Frontend für Nicht-Admins ausblenden
-		add_filter( 'show_admin_bar', array( $this, 'hide_admin_bar_for_non_admins' ) );
+		// Admin-Bar: nicht erlaubte Knoten ausblenden
+		add_action( 'admin_bar_menu', array( $this, 'filter_admin_bar' ), 999 );
 	}
 
 	// -------------------------------------------------------------------------
@@ -219,19 +219,80 @@ class WP_UserRights_Admin_Menu {
 	}
 
 	/**
-	 * Blendet die Admin-Bar im Frontend für alle Nicht-Administratoren aus.
+	 * Filtert die Admin-Bar für Nicht-Admins: entfernt alle Knoten,
+	 * auf die der Benutzer keinen Zugriff hat.
+	 *
+	 * @param WP_Admin_Bar $wp_admin_bar
 	 */
-	public function hide_admin_bar_for_non_admins( $show ) {
-		if ( is_admin() ) {
-			return $show;
-		}
+	public function filter_admin_bar( $wp_admin_bar ) {
 		if ( ! is_user_logged_in() ) {
-			return $show;
+			return;
 		}
 		if ( current_user_can( 'manage_options' ) ) {
-			return $show;
+			return;
 		}
-		return false;
+
+		$user          = wp_get_current_user();
+		$allowed_slugs = $this->get_allowed_slugs_for_user( $user );
+
+		// Immer entfernen: WordPress-Logo-Menü (Docs, About, Updates) und Suche
+		$wp_admin_bar->remove_node( 'wp-logo' );
+		$wp_admin_bar->remove_node( 'search' );
+
+		// Updates-Icon: nur bei Zugriff auf update-core.php anzeigen
+		if ( ! in_array( 'update-core.php', $allowed_slugs, true ) ) {
+			$wp_admin_bar->remove_node( 'updates' );
+		}
+
+		// Kommentar-Glocke: nur bei Zugriff auf edit-comments.php anzeigen
+		if ( ! in_array( 'edit-comments.php', $allowed_slugs, true ) ) {
+			$wp_admin_bar->remove_node( 'comments' );
+		}
+
+		// Site-Name-Untermenü: Admin-Links herausfiltern wenn kein Zugriff
+		$site_subnodes = array(
+			'themes'      => 'themes.php',
+			'widgets'     => 'widgets.php',
+			'menus'       => 'nav-menus.php',
+			'customize'   => null,   // komplexe Preview-URL, immer entfernen
+			'background'  => null,
+			'header'      => null,
+			'site-editor' => null,
+		);
+		foreach ( $site_subnodes as $node_id => $slug ) {
+			if ( null === $slug || ! in_array( $slug, $allowed_slugs, true ) ) {
+				$wp_admin_bar->remove_node( $node_id );
+			}
+		}
+
+		// "+Neu"-Menü: Einträge nach erlaubten Slugs filtern
+		$new_item_slugs = array(
+			'new-post'  => 'post-new.php',
+			'new-media' => 'media-new.php',
+			'new-user'  => 'user-new.php',
+			'new-link'  => null,   // veraltet
+		);
+
+		// Seiten und Custom Post Types dynamisch ergänzen
+		foreach ( get_post_types( array( 'show_in_admin_bar' => true ), 'names' ) as $cpt ) {
+			if ( 'post' !== $cpt ) {
+				$new_item_slugs[ 'new-' . $cpt ] = 'post-new.php?post_type=' . $cpt;
+			}
+		}
+
+		$has_new_item = false;
+		foreach ( $new_item_slugs as $node_id => $slug ) {
+			if ( null === $slug || ! in_array( $slug, $allowed_slugs, true ) ) {
+				$wp_admin_bar->remove_node( $node_id );
+			} else {
+				$has_new_item = true;
+			}
+		}
+
+		// "+Neu"-Parent entfernen wenn keine Einträge übrig
+		if ( ! $has_new_item ) {
+			$wp_admin_bar->remove_node( 'new-content' );
+		}
 	}
 
 	/**
