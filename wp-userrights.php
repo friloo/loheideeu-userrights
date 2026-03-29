@@ -1,7 +1,7 @@
 <?php
 /**
  * Plugin Name: Loheide.eu - User Rights
- * Plugin URI:  https://loheide.eu
+ * Plugin URI:  https://github.com/friloo/loheideeu-userrights
  * Description: Steuert die Sichtbarkeit von WordPress-Backend-Menüpunkten pro Benutzerrolle. Admins sehen alles, alle anderen nur explizit freigegebene Menüpunkte.
  * Version:     1.1.0
  * Author:      Friederich Loheide
