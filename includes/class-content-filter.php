@@ -13,9 +13,11 @@ class WP_UserRights_Content_Filter {
 	public function __construct() {
 		// Listenansichten und REST API
 		add_action( 'pre_get_posts', array( $this, 'filter_content' ) );
-		// Kategorie-Auswahl im Post-Editor einschränken
-		add_filter( 'get_terms', array( $this, 'filter_category_terms' ), 10, 4 );
-		// Kategorien beim Speichern eines Beitrags erzwingen
+		// Kategorie-Auswahl: klassischer Editor (modifiziert WP_Term_Query-Args vor Ausführung)
+		add_filter( 'get_terms_args', array( $this, 'filter_category_terms_args' ), 10, 2 );
+		// Kategorie-Auswahl: Gutenberg Block-Editor (REST API)
+		add_filter( 'rest_category_query', array( $this, 'filter_rest_category_query' ), 10, 2 );
+		// Kategorien beim Speichern erzwingen (Absicherung gegen direkte Requests)
 		add_action( 'save_post_post', array( $this, 'enforce_category_on_save' ), 20, 2 );
 		// Medien-Modal (Gutenberg + klassischer Editor)
 		add_filter( 'ajax_query_attachments_args', array( $this, 'filter_media_modal' ) );
@@ -67,36 +69,60 @@ class WP_UserRights_Content_Filter {
 	}
 
 	// =========================================================================
-	// Kategorie-Auswahl im Post-Editor einschränken
+	// Kategorie-Auswahl einschränken
 	// =========================================================================
 
-	public function filter_category_terms( $terms, $taxonomies, $args, $term_query = null ) {
+	/**
+	 * Klassischer Editor: schränkt WP_Term_Query-Args auf erlaubte Kategorien ein.
+	 * Läuft vor der Datenbankabfrage — zuverlässiger als das nachträgliche Filtern.
+	 */
+	public function filter_category_terms_args( $args, $taxonomies ) {
 		if ( ! is_admin() ) {
-			return $terms;
+			return $args;
 		}
 
 		$user = wp_get_current_user();
 		if ( ! $user->exists() || current_user_can( 'manage_options' ) ) {
-			return $terms;
+			return $args;
 		}
 
 		$taxs = is_array( $taxonomies ) ? $taxonomies : array( $taxonomies );
 		if ( ! in_array( 'category', $taxs, true ) ) {
-			return $terms;
+			return $args;
 		}
 
 		$r = $this->get_user_content_restrictions( $user );
 		if ( ! $r['restrict_cats'] ) {
-			return $terms;
+			return $args;
 		}
 
-		// Nur WP_Term-Objekte filtern; reine ID-Arrays unverändert lassen
-		return array_values( array_filter( $terms, function ( $term ) use ( $r ) {
-			if ( ! ( $term instanceof WP_Term ) ) {
-				return true;
-			}
-			return in_array( $term->slug, $r['cats'], true );
-		} ) );
+		// Auf erlaubte Slugs beschränken (Schnittmenge mit evtl. vorhandenen Slug-Filtern)
+		$args['slug'] = isset( $args['slug'] )
+			? array_values( array_intersect( (array) $args['slug'], $r['cats'] ) )
+			: $r['cats'];
+
+		return $args;
+	}
+
+	/**
+	 * Gutenberg Block-Editor: schränkt REST-API-Anfragen für Kategorien ein.
+	 */
+	public function filter_rest_category_query( $args, $request ) {
+		$user = wp_get_current_user();
+		if ( ! $user->exists() || current_user_can( 'manage_options' ) ) {
+			return $args;
+		}
+
+		$r = $this->get_user_content_restrictions( $user );
+		if ( ! $r['restrict_cats'] ) {
+			return $args;
+		}
+
+		$args['slug'] = isset( $args['slug'] )
+			? array_values( array_intersect( (array) $args['slug'], $r['cats'] ) )
+			: $r['cats'];
+
+		return $args;
 	}
 
 	// =========================================================================

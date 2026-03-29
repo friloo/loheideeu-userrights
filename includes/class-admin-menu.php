@@ -139,6 +139,16 @@ class WP_UserRights_Admin_Menu {
 			return true; // Admins-only durch WP-Capability, nicht durch dieses Plugin
 		}
 
+		// post-new.php: immer nach post_type unterscheiden — 'post-new.php' (Beiträge)
+		// darf nie automatisch für andere Post-Typen (z.B. Seiten) gelten.
+		if ( 'post-new.php' === $pagenow ) {
+			$post_type  = isset( $_GET['post_type'] ) ? sanitize_key( $_GET['post_type'] ) : 'post';
+			$check_slug = ( '' === $post_type || 'post' === $post_type )
+				? 'post-new.php'
+				: 'post-new.php?post_type=' . $post_type;
+			return in_array( $check_slug, $allowed_slugs, true );
+		}
+
 		// Direkter Slug-Treffer (z.B. 'edit.php', 'upload.php')
 		if ( in_array( $pagenow, $allowed_slugs, true ) ) {
 			return true;
