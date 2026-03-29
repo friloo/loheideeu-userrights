@@ -914,7 +914,7 @@ class WP_UserRights_Settings {
 		// Einträge zu bearbeiten — zugehörige Caps automatisch mitgeben.
 		$cap_expansions = array(
 			'edit_posts'   => array( 'edit_others_posts', 'edit_published_posts', 'publish_posts' ),
-			'edit_pages'   => array( 'edit_others_pages', 'edit_published_pages' ),
+			'edit_pages'   => array( 'edit_others_pages', 'edit_published_pages', 'publish_pages' ),
 			'delete_posts' => array( 'delete_others_posts', 'delete_published_posts' ),
 			'delete_pages' => array( 'delete_others_pages', 'delete_published_pages' ),
 		);

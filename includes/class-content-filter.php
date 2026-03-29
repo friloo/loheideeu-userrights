@@ -13,10 +13,8 @@ class WP_UserRights_Content_Filter {
 	public function __construct() {
 		// Listenansichten und REST API
 		add_action( 'pre_get_posts', array( $this, 'filter_content' ) );
-		// Kategorie-Auswahl: klassischer Editor (modifiziert WP_Term_Query-Args vor Ausführung)
-		add_filter( 'get_terms_args', array( $this, 'filter_category_terms_args' ), 10, 2 );
-		// Kategorie-Auswahl: Gutenberg Block-Editor (REST API)
-		add_filter( 'rest_category_query', array( $this, 'filter_rest_category_query' ), 10, 2 );
+		// Kategorie-Auswahl: direkt am Term-Query-Objekt (klassisch + Gutenberg + REST)
+		add_action( 'pre_get_terms', array( $this, 'restrict_category_query' ) );
 		// Kategorien beim Speichern erzwingen (Absicherung gegen direkte Requests)
 		add_action( 'save_post_post', array( $this, 'enforce_category_on_save' ), 20, 2 );
 		// Medien-Modal (Gutenberg + klassischer Editor)
@@ -73,56 +71,38 @@ class WP_UserRights_Content_Filter {
 	// =========================================================================
 
 	/**
-	 * Klassischer Editor: schränkt WP_Term_Query-Args auf erlaubte Kategorien ein.
-	 * Läuft vor der Datenbankabfrage — zuverlässiger als das nachträgliche Filtern.
+	 * Schränkt WP_Term_Query direkt am Query-Objekt ein — greift für klassischen
+	 * Editor, Gutenberg (REST API) und alle anderen Term-Query-Kontexte.
+	 * Wird als Action aufgerufen, modifiziert das Objekt in-place.
+	 *
+	 * @param WP_Term_Query $query
 	 */
-	public function filter_category_terms_args( $args, $taxonomies ) {
-		if ( ! is_admin() ) {
-			return $args;
+	public function restrict_category_query( $query ) {
+		$taxonomies = (array) $query->query_vars['taxonomy'];
+		if ( ! in_array( 'category', $taxonomies, true ) ) {
+			return;
 		}
 
 		$user = wp_get_current_user();
 		if ( ! $user->exists() || current_user_can( 'manage_options' ) ) {
-			return $args;
-		}
-
-		$taxs = is_array( $taxonomies ) ? $taxonomies : array( $taxonomies );
-		if ( ! in_array( 'category', $taxs, true ) ) {
-			return $args;
+			return;
 		}
 
 		$r = $this->get_user_content_restrictions( $user );
 		if ( ! $r['restrict_cats'] ) {
-			return $args;
+			return;
 		}
 
-		// Auf erlaubte Slugs beschränken (Schnittmenge mit evtl. vorhandenen Slug-Filtern)
-		$args['slug'] = isset( $args['slug'] )
-			? array_values( array_intersect( (array) $args['slug'], $r['cats'] ) )
-			: $r['cats'];
-
-		return $args;
-	}
-
-	/**
-	 * Gutenberg Block-Editor: schränkt REST-API-Anfragen für Kategorien ein.
-	 */
-	public function filter_rest_category_query( $args, $request ) {
-		$user = wp_get_current_user();
-		if ( ! $user->exists() || current_user_can( 'manage_options' ) ) {
-			return $args;
+		// Slug-Liste direkt in den Query schreiben.
+		// Bereits gesetzte Slugs werden auf die Schnittmenge reduziert.
+		if ( ! empty( $query->query_vars['slug'] ) ) {
+			$query->query_vars['slug'] = array_values( array_intersect(
+				(array) $query->query_vars['slug'],
+				$r['cats']
+			) );
+		} else {
+			$query->query_vars['slug'] = $r['cats'];
 		}
-
-		$r = $this->get_user_content_restrictions( $user );
-		if ( ! $r['restrict_cats'] ) {
-			return $args;
-		}
-
-		$args['slug'] = isset( $args['slug'] )
-			? array_values( array_intersect( (array) $args['slug'], $r['cats'] ) )
-			: $r['cats'];
-
-		return $args;
 	}
 
 	// =========================================================================
