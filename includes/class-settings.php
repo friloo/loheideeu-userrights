@@ -401,7 +401,7 @@ class WP_UserRights_Settings {
 						<th scope="row"><label for="wp-userrights-categories"><?php esc_html_e( 'Nur Beiträge in Kategorien', 'wp-userrights' ); ?></label></th>
 						<td>
 							<input type="text" id="wp-userrights-categories" name="allowed_categories"
-								value="<?php echo esc_attr( $allowed_categories ); ?>" class="regular-text" placeholder="mav, aktuell">
+								value="<?php echo esc_attr( $allowed_categories ); ?>" class="regular-text" placeholder="team1, aktuell">
 							<p class="description"><?php esc_html_e( 'Kategorie-Slugs, kommagetrennt.', 'wp-userrights' ); ?></p>
 						</td>
 					</tr>
@@ -409,7 +409,7 @@ class WP_UserRights_Settings {
 						<th scope="row"><label for="wp-userrights-pages"><?php esc_html_e( 'Nur Seiten mit diesen Slugs', 'wp-userrights' ); ?></label></th>
 						<td>
 							<input type="text" id="wp-userrights-pages" name="allowed_page_slugs"
-								value="<?php echo esc_attr( $allowed_pages ); ?>" class="regular-text" placeholder="mav, kuenstlerteam">
+								value="<?php echo esc_attr( $allowed_pages ); ?>" class="regular-text" placeholder="team1, team2">
 							<p class="description"><?php esc_html_e( 'Seiten-Slugs, kommagetrennt.', 'wp-userrights' ); ?></p>
 						</td>
 					</tr>
@@ -474,14 +474,14 @@ class WP_UserRights_Settings {
 						<th scope="row"><label for="wpur-role-name"><?php esc_html_e( 'Rollenname', 'wp-userrights' ); ?></label></th>
 						<td>
 							<input type="text" id="wpur-role-name" name="role_name" class="regular-text"
-								placeholder="<?php esc_attr_e( 'z. B. MAV', 'wp-userrights' ); ?>" required>
+								placeholder="<?php esc_attr_e( 'z. B. Team 1', 'wp-userrights' ); ?>" required>
 						</td>
 					</tr>
 					<tr>
 						<th scope="row"><label for="wpur-role-slug"><?php esc_html_e( 'Rollen-ID (Slug)', 'wp-userrights' ); ?></label></th>
 						<td>
 							<input type="text" id="wpur-role-slug" name="role_slug" class="regular-text"
-								placeholder="<?php esc_attr_e( 'mav', 'wp-userrights' ); ?>" required
+								placeholder="<?php esc_attr_e( 'team1', 'wp-userrights' ); ?>" required
 								pattern="[a-z0-9_\-]+" title="<?php esc_attr_e( 'Nur Kleinbuchstaben, Zahlen, Bindestriche und Unterstriche.', 'wp-userrights' ); ?>">
 							<p class="description"><?php esc_html_e( 'Kleinbuchstaben, keine Sonderzeichen. Kann nach dem Erstellen nicht geändert werden.', 'wp-userrights' ); ?></p>
 						</td>
