@@ -3,7 +3,7 @@
  * Plugin Name: WP User Rights
  * Plugin URI:  https://loheide.eu
  * Description: Steuert die Sichtbarkeit von WordPress-Backend-Menüpunkten pro Benutzerrolle. Admins sehen alles, alle anderen nur explizit freigegebene Menüpunkte.
- * Version:     1.0.0
+ * Version:     1.1.0
  * Author:      Friederich Loheide
  * Author URI:  https://loheide.eu
  * Text Domain: wp-userrights
@@ -16,7 +16,7 @@ if ( ! defined( 'ABSPATH' ) ) {
 	exit;
 }
 
-define( 'WP_USERRIGHTS_VERSION', '1.0.0' );
+define( 'WP_USERRIGHTS_VERSION', '1.1.0' );
 define( 'WP_USERRIGHTS_DIR', plugin_dir_path( __FILE__ ) );
 define( 'WP_USERRIGHTS_URL', plugin_dir_url( __FILE__ ) );
 define( 'WP_USERRIGHTS_OPTION', 'wp_userrights_permissions' );

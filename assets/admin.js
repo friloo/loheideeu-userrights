@@ -223,6 +223,18 @@
         });
 
         // --------------------------------------------------------------------
+        // Tab: Benutzer – Suchfeld (Debounce → Auto-Submit)
+        // --------------------------------------------------------------------
+        var userSearchTimer;
+        $('#wpur-user-search').on('input', function () {
+            clearTimeout(userSearchTimer);
+            userSearchTimer = setTimeout(function () {
+                var $form = $('#wpur-user-search').closest('form');
+                if ($form.length) { $form.submit(); }
+            }, 400);
+        });
+
+        // --------------------------------------------------------------------
         // Tab: Benutzer – AJAX-Toggle für Rollenzuweisungen
         // --------------------------------------------------------------------
         $(document).on('change', '.wpur-role-toggle', function () {

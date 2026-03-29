@@ -719,6 +719,115 @@
 }
 
 /* ==========================================================================
+   Benutzer-Suche
+   ========================================================================== */
+
+.wpur-user-search-form {
+    margin-bottom: 16px;
+}
+
+.wpur-user-search-wrap {
+    position: relative;
+    display: inline-flex;
+    align-items: center;
+    background: var(--wpur-white);
+    border: 1px solid var(--wpur-border);
+    border-radius: var(--wpur-radius);
+    box-shadow: var(--wpur-shadow);
+    transition: border-color var(--wpur-transition), box-shadow var(--wpur-transition);
+    max-width: 340px;
+    width: 100%;
+}
+
+.wpur-user-search-wrap:focus-within {
+    border-color: var(--wpur-blue);
+    box-shadow: 0 0 0 2px rgba(34, 113, 177, .15);
+}
+
+.wpur-user-search-wrap > .dashicons {
+    position: absolute;
+    left: 10px;
+    color: var(--wpur-text-muted);
+    pointer-events: none;
+}
+
+#wpur-user-search {
+    width: 100%;
+    border: none !important;
+    box-shadow: none !important;
+    background: transparent;
+    padding: 7px 36px 7px 36px !important;
+    font-size: 13px;
+}
+
+.wpur-search-clear {
+    position: absolute;
+    right: 8px;
+    color: var(--wpur-text-muted);
+    line-height: 1;
+    text-decoration: none;
+    display: flex;
+    align-items: center;
+}
+
+.wpur-search-clear:hover {
+    color: var(--wpur-orange);
+}
+
+/* ==========================================================================
+   Pagination
+   ========================================================================== */
+
+.wpur-pagination {
+    display: flex;
+    align-items: center;
+    gap: 12px;
+    margin-top: 16px;
+    flex-wrap: wrap;
+}
+
+.wpur-pagination .page-numbers {
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    min-width: 32px;
+    height: 32px;
+    padding: 0 8px;
+    border: 1px solid var(--wpur-border);
+    border-radius: var(--wpur-radius);
+    background: var(--wpur-white);
+    color: var(--wpur-text);
+    text-decoration: none;
+    font-size: 13px;
+    transition: background var(--wpur-transition), border-color var(--wpur-transition);
+}
+
+.wpur-pagination .page-numbers:hover {
+    background: var(--wpur-blue-light);
+    border-color: var(--wpur-blue);
+    color: var(--wpur-blue);
+}
+
+.wpur-pagination .page-numbers.current {
+    background: var(--wpur-blue);
+    border-color: var(--wpur-blue);
+    color: #fff;
+    font-weight: 600;
+    pointer-events: none;
+}
+
+.wpur-pagination .page-numbers.dots {
+    border: none;
+    background: transparent;
+    color: var(--wpur-text-muted);
+}
+
+.wpur-pagination-info {
+    font-size: 12px;
+    color: var(--wpur-text-muted);
+}
+
+/* ==========================================================================
    Benutzertabelle
    ========================================================================== */
 

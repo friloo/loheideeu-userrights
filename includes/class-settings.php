@@ -507,29 +507,74 @@ class WP_UserRights_Settings {
 		</div>
 		<?php return; endif;
 
-		// Alle Benutzer außer Admins laden
-		$users = get_users( array(
+		// Suche und Pagination
+		$per_page   = 20;
+		$paged      = isset( $_GET['paged'] ) ? max( 1, absint( $_GET['paged'] ) ) : 1;
+		$search     = isset( $_GET['user_search'] ) ? sanitize_text_field( wp_unslash( $_GET['user_search'] ) ) : '';
+
+		$query_args = array(
 			'role__not_in' => array( 'administrator' ),
 			'orderby'      => 'display_name',
 			'order'        => 'ASC',
-			'number'       => 200,
-		) );
+			'number'       => $per_page,
+			'offset'       => ( $paged - 1 ) * $per_page,
+			'count_total'  => true,
+		);
+
+		if ( ! empty( $search ) ) {
+			$query_args['search']         = '*' . $search . '*';
+			$query_args['search_columns'] = array( 'display_name', 'user_email', 'user_login' );
+		}
+
+		$user_query  = new WP_User_Query( $query_args );
+		$users       = $user_query->get_results();
+		$total_users = (int) $user_query->get_total();
+		$total_pages = (int) ceil( $total_users / $per_page );
 		?>
 
 		<div class="wp-userrights-section">
 			<h2>
 				<span class="dashicons dashicons-groups"></span>
 				<?php esc_html_e( 'Rollen zuweisen', 'wp-userrights' ); ?>
-				<span class="wpur-count-badge" style="margin-left:8px;"><?php echo count( $users ); ?></span>
+				<span class="wpur-count-badge" style="margin-left:8px;"><?php echo esc_html( $total_users ); ?></span>
 			</h2>
 			<p class="description">
 				<?php esc_html_e( 'Weisen Sie Benutzern zusätzlich zu ihrer Basis-Rolle eine eigene Rolle zu. Die Zuweisung erfolgt sofort — kein Speichern nötig.', 'wp-userrights' ); ?>
 			</p>
 
+			<!-- Suche -->
+			<form method="get" action="<?php echo esc_url( admin_url( 'admin.php' ) ); ?>" class="wpur-user-search-form">
+				<input type="hidden" name="page" value="wp-userrights">
+				<input type="hidden" name="tab" value="benutzer">
+				<div class="wpur-user-search-wrap">
+					<span class="dashicons dashicons-search"></span>
+					<input type="text" id="wpur-user-search" name="user_search"
+						value="<?php echo esc_attr( $search ); ?>"
+						placeholder="<?php esc_attr_e( 'Name oder E-Mail suchen …', 'wp-userrights' ); ?>"
+						autocomplete="off">
+					<?php if ( ! empty( $search ) ) : ?>
+					<a href="<?php echo esc_url( add_query_arg( array( 'page' => 'wp-userrights', 'tab' => 'benutzer' ), admin_url( 'admin.php' ) ) ); ?>"
+						class="wpur-search-clear" title="<?php esc_attr_e( 'Suche zurücksetzen', 'wp-userrights' ); ?>">
+						<span class="dashicons dashicons-dismiss"></span>
+					</a>
+					<?php endif; ?>
+				</div>
+			</form>
+
 			<?php if ( empty( $users ) ) : ?>
 			<p class="wpur-empty-state">
 				<span class="dashicons dashicons-info"></span>
-				<?php esc_html_e( 'Keine Benutzer gefunden.', 'wp-userrights' ); ?>
+				<?php
+				if ( ! empty( $search ) ) {
+					printf(
+						/* translators: %s: search term */
+						esc_html__( 'Keine Benutzer gefunden für „%s".', 'wp-userrights' ),
+						esc_html( $search )
+					);
+				} else {
+					esc_html_e( 'Keine Benutzer gefunden.', 'wp-userrights' );
+				}
+				?>
 			</p>
 			<?php else : ?>
 			<div class="wpur-user-table-wrap">
@@ -602,6 +647,35 @@ class WP_UserRights_Settings {
 					</tbody>
 				</table>
 			</div>
+
+			<?php if ( $total_pages > 1 ) :
+				$base_url = add_query_arg( array( 'page' => 'wp-userrights', 'tab' => 'benutzer' ), admin_url( 'admin.php' ) );
+				if ( ! empty( $search ) ) {
+					$base_url = add_query_arg( 'user_search', urlencode( $search ), $base_url );
+				}
+				$pagination = paginate_links( array(
+					'base'      => add_query_arg( 'paged', '%#%', $base_url ),
+					'format'    => '',
+					'current'   => $paged,
+					'total'     => $total_pages,
+					'prev_text' => '&laquo;',
+					'next_text' => '&raquo;',
+					'type'      => 'plain',
+				) );
+			?>
+			<div class="wpur-pagination">
+				<?php echo $pagination; // phpcs:ignore WordPress.Security.EscapeOutput.OutputNotEscaped ?>
+				<span class="wpur-pagination-info">
+					<?php printf(
+						/* translators: 1: first item, 2: last item, 3: total */
+						esc_html__( '%1$d–%2$d von %3$d Benutzern', 'wp-userrights' ),
+						( ( $paged - 1 ) * $per_page ) + 1,
+						min( $paged * $per_page, $total_users ),
+						$total_users
+					); ?>
+				</span>
+			</div>
+			<?php endif; ?>
 			<?php endif; ?>
 		</div>
 		<?php

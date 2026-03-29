@@ -17,6 +17,8 @@ class WP_UserRights_Admin_Menu {
 		add_action( 'admin_init', array( $this, 'check_direct_access' ) );
 		// Hinweis anzeigen wenn jemand auf das Dashboard umgeleitet wurde
 		add_action( 'admin_notices', array( $this, 'show_access_denied_notice' ) );
+		// Login-Weiterleitung: direkt zur ersten erlaubten Seite
+		add_filter( 'login_redirect', array( $this, 'login_redirect' ), 10, 3 );
 	}
 
 	// -------------------------------------------------------------------------
@@ -212,6 +214,40 @@ class WP_UserRights_Admin_Menu {
 	 */
 	private function is_slug_allowed( $slug, array $allowed_slugs ) {
 		return in_array( $slug, $allowed_slugs, true );
+	}
+
+	/**
+	 * Leitet den User nach dem Login direkt zur ersten erlaubten Admin-Seite weiter.
+	 */
+	public function login_redirect( $redirect_to, $requested_redirect_to, $user ) {
+		if ( is_wp_error( $user ) || ! ( $user instanceof WP_User ) ) {
+			return $redirect_to;
+		}
+
+		// Admins → Standard-Verhalten
+		if ( in_array( 'administrator', (array) $user->roles, true ) ) {
+			return $redirect_to;
+		}
+
+		// Reine Abonnenten → Frontend
+		$user_roles = array_values( (array) $user->roles );
+		sort( $user_roles );
+		if ( $user_roles === array( 'subscriber' ) ) {
+			return home_url();
+		}
+
+		$allowed_slugs = $this->get_allowed_slugs_for_user( $user );
+
+		// Ersten nicht-Dashboard-Slug als Ziel nehmen
+		foreach ( $allowed_slugs as $slug ) {
+			if ( 'index.php' === $slug ) {
+				continue;
+			}
+			return admin_url( $slug );
+		}
+
+		// Fallback: Dashboard
+		return admin_url( 'index.php' );
 	}
 
 	/**

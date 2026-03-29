@@ -2,7 +2,7 @@
 
 **Autor:** Friederich Loheide
 **Website:** [loheide.eu](https://loheide.eu)
-**Version:** 1.0.0
+**Version:** 1.1.0
 **Erfordert WordPress:** 5.8+
 **Erfordert PHP:** 7.4+
 **Lizenz:** GPL-2.0-or-later
@@ -22,12 +22,17 @@ Das Plugin liest alle im WordPress-Backend registrierten Menüpunkte dynamisch a
 - **Menü-Zugriffskontrolle** — Legt pro Rolle fest, welche Top-Level- und Untermenüpunkte sichtbar sind
 - **Automatische Capability-Vergabe** — Beim Speichern werden die benötigten WordPress-Capabilities der Rolle automatisch hinzugefügt und beim Entziehen von Rechten wieder entfernt
 - **Direktzugriff-Schutz** — Blockiert den direkten URL-Aufruf von nicht erlaubten Seiten, nicht nur die Menü-Sichtbarkeit
+- **Login-Weiterleitung** — Nach dem Login werden Benutzer direkt zur ersten erlaubten Seite weitergeleitet
 - **Inhaltsfilter** — Schränkt die Admin-Listen für Beiträge (nach Kategorie) und Seiten (nach Slug) ein
 - **Gutenberg / REST API** — Die Inhaltsfilter gelten auch für REST-API-Anfragen des Block-Editors
 - **Multi-Rollen-Unterstützung** — Hat ein Benutzer mehrere Rollen, erhält er die Vereinigung aller Rechte
-- **Suchfunktion** — Menüpunkte in der Einstellungsseite durchsuchbar
+- **Eigene Rollen erstellen** — Neue Benutzerrollen direkt im Plugin anlegen und löschen
+- **Benutzerverwaltung** — Eigene Rollen per Toggle-Schalter additiv zu Benutzern zuweisen (AJAX, ohne Seitenneuladen)
+- **Abonnenten-Sperre** — Benutzer mit ausschließlich der Abonnenten-Rolle werden vollständig aus dem Backend ausgesperrt
+- **Suchfunktion** — Menüpunkte und Benutzer in der Einstellungsseite durchsuchbar
+- **Paginierung** — Benutzerliste wird seitenweise angezeigt (20 pro Seite)
 - **Capability-Vorschau** — Zeigt live an, welche WordPress-Capabilities die aktuelle Auswahl verleiht
-- **Saubere Deinstallation** — Entfernt alle Optionen und vergebenen Capabilities beim Löschen des Plugins
+- **Saubere Deinstallation** — Entfernt alle Optionen, vergebenen Capabilities und plugin-erstellte Rollen beim Löschen des Plugins
 
 ---
 
@@ -41,15 +46,23 @@ Das Plugin liest alle im WordPress-Backend registrierten Menüpunkte dynamisch a
 
 ## Verwendung
 
-### Schritt 1 — Rolle wählen
-Auf der Einstellungsseite (**Benutzerrechte**) im Dropdown die gewünschte Rolle auswählen.
+Die Einstellungsseite ist in drei Tabs gegliedert.
 
-### Schritt 2 — Menüpunkte freigeben
+---
+
+### Tab „Berechtigungen"
+
+Hier werden die Menürechte pro Rolle konfiguriert.
+
+#### Schritt 1 — Rolle wählen
+Im Dropdown die gewünschte Rolle auswählen. Eigene (plugin-erstellte) Rollen sind mit einem grünen Badge gekennzeichnet, WordPress-Standardrollen mit einem orangenen Warnhinweis.
+
+#### Schritt 2 — Menüpunkte freigeben
 Die Checkboxen der erlaubten Menüpunkte aktivieren. Die Baumstruktur zeigt Top-Level-Einträge und deren Untermenüs. Wird ein Untermenüpunkt aktiviert, wird der übergeordnete Eintrag automatisch mitgesetzt.
 
 Die **Capability-Vorschau** unter der Toolbar zeigt in Echtzeit, welche WordPress-Capabilities beim Speichern an die Rolle vergeben werden.
 
-### Schritt 3 — Inhaltsfilter (optional)
+#### Schritt 3 — Inhaltsfilter (optional)
 Unterhalb der Menü-Checkboxen können optional Inhaltsfilter konfiguriert werden:
 
 | Feld | Beschreibung |
@@ -59,8 +72,46 @@ Unterhalb der Menü-Checkboxen können optional Inhaltsfilter konfiguriert werde
 
 Leer lassen = keine Einschränkung (sofern der Menüzugriff besteht).
 
-### Schritt 4 — Speichern
+#### Schritt 4 — Speichern
 Auf **Einstellungen speichern** klicken. Das Plugin vergibt die benötigten Capabilities automatisch an die Rolle.
+
+---
+
+### Tab „Rollen verwalten"
+
+Hier können neue Benutzerrollen für WordPress erstellt werden — direkt im Plugin, ohne weiteres Plugin.
+
+#### Neue Rolle erstellen
+1. **Rollenname** eingeben (z. B. „MAV") — der Slug wird automatisch generiert
+2. Den generierten **Rollen-Slug** prüfen und ggf. anpassen
+3. Auf **Rolle erstellen** klicken
+
+Die neue Rolle erscheint sofort in der Rollenliste unterhalb und ist in allen anderen Tabs verfügbar.
+
+#### Rollen löschen
+Nur vom Plugin erstellte Rollen können gelöscht werden. Beim Löschen:
+- Wird die Rolle von allen betroffenen Benutzern entfernt
+- Werden die Rollendefinition und alle gespeicherten Berechtigungen gelöscht
+
+---
+
+### Tab „Benutzer"
+
+Hier können Benutzern zusätzlich zu ihrer Basis-Rolle eigene plugin-verwaltete Rollen zugewiesen werden.
+
+#### Rollenübersicht
+Die Tabelle zeigt alle Benutzer (außer Administratoren) mit:
+- **Avatar und Name/E-Mail**
+- **Basis-Rolle** — die ursprüngliche WordPress-Rolle des Benutzers
+- **Toggle-Schalter** je plugin-verwalteter Rolle — schaltet die Rolle sofort per AJAX ein oder aus
+
+Die Zuweisung ist **additiv**: Der Benutzer behält seine Basis-Rolle und erhält zusätzlich die gewählte Rolle. Er erhält damit die Vereinigung aller Rechte beider Rollen.
+
+#### Suche
+Über das Suchfeld können Benutzer nach Name, Anzeigename oder E-Mail-Adresse gefiltert werden. Die Suche löst nach kurzer Tipp-Pause automatisch aus.
+
+#### Paginierung
+Bei mehr als 20 Benutzern erscheinen Seitennavigation und eine Anzeige „X–Y von Z Benutzern". Die Suche berücksichtigt alle Seiten.
 
 ---
 
@@ -69,14 +120,22 @@ Auf **Einstellungen speichern** klicken. Das Plugin vergibt die benötigten Capa
 ### Rolle „MAV"
 Die Rolle soll Beiträge in der Kategorie „MAV" schreiben und die Unterseite „MAV" unter Seiten bearbeiten können.
 
-**Menü-Checkboxen aktivieren:**
+**Schritt 1 — Rolle erstellen (Tab „Rollen verwalten"):**
+- Rollenname: `MAV`, Slug: `mav` → Rolle erstellen
+
+**Schritt 2 — Berechtigungen setzen (Tab „Berechtigungen"):**
+
+Menü-Checkboxen aktivieren:
 - Beiträge (`edit.php`)
 - Neuen Beitrag erstellen (`post-new.php`)
 - Seiten (`edit.php?post_type=page`) — wird automatisch gesetzt wenn Unterseite gewählt
 
-**Inhaltsfilter:**
+Inhaltsfilter:
 - Nur Beiträge in Kategorien: `mav`
 - Nur Seiten mit diesen Slugs: `mav`
+
+**Schritt 3 — Benutzer zuweisen (Tab „Benutzer"):**
+Den gewünschten Benutzer suchen und den Toggle für „MAV" aktivieren.
 
 ### Rolle „Künstlerteam"
 Die Rolle soll nur das eigene Plugin „Künstlerteam" und die gleichnamige Seite sehen.
@@ -92,8 +151,14 @@ Die Rolle soll nur das eigene Plugin „Künstlerteam" und die gleichnamige Seit
 
 ## Hinweise
 
+### Login-Weiterleitung
+Nach dem Login werden Benutzer (außer Admins) automatisch zur ersten für sie erlaubten Seite weitergeleitet — statt wie üblich zum Dashboard. Benutzer mit ausschließlich der Abonnenten-Rolle werden zum Frontend weitergeleitet.
+
+### Abonnenten-Sperre
+Benutzer, deren einzige Rolle „Abonnent/Subscriber" ist, werden vollständig aus dem WordPress-Backend ausgesperrt und zum Frontend umgeleitet — auch bei direktem URL-Aufruf.
+
 ### WordPress-Standardrollen
-Die Plugin-Einstellungsseite zeigt eine Warnung wenn eine eingebaute WordPress-Rolle (Editor, Autor, Mitarbeiter, Abonnent) bearbeitet wird. Diese Rollen haben bereits vordefinierte Capabilities — Änderungen können deren normales Verhalten beeinflussen. Es wird empfohlen, für diesen Zweck **eigene benutzerdefinierte Rollen** zu erstellen (z. B. mit einem Role-Manager-Plugin wie *Members* oder *User Role Editor*).
+Die Plugin-Einstellungsseite zeigt eine Warnung wenn eine eingebaute WordPress-Rolle (Editor, Autor, Mitarbeiter, Abonnent) bearbeitet wird. Diese Rollen haben bereits vordefinierte Capabilities — Änderungen können deren normales Verhalten beeinflussen. Es wird empfohlen, für diesen Zweck **eigene benutzerdefinierte Rollen** zu erstellen (Tab „Rollen verwalten").
 
 ### Capability-Verwaltung
 Das Plugin merkt sich welche Capabilities es einer Rolle hinzugefügt hat (`managed_caps`). Beim Entziehen von Menürechten werden nur diese selbst verwalteten Capabilities wieder entfernt — Capabilities die die Rolle bereits zuvor hatte, bleiben erhalten.
@@ -105,6 +170,7 @@ Das Entfernen von Menüpunkten ist nicht nur optisch: Das Plugin prüft bei jede
 Beim **Löschen** des Plugins (nicht nur Deaktivieren) werden automatisch:
 - Die Option `wp_userrights_permissions` aus der Datenbank entfernt
 - Alle durch das Plugin vergebenen Capabilities von den Rollen zurückgenommen
+- Alle plugin-erstellten Rollen von allen Benutzern entfernt und aus WordPress gelöscht
 
 ---
 
@@ -113,14 +179,17 @@ Beim **Löschen** des Plugins (nicht nur Deaktivieren) werden automatisch:
 | Datei | Funktion |
 |---|---|
 | `wp-userrights.php` | Bootstrap, Konstanten, Hook-Registrierung |
-| `includes/class-admin-menu.php` | Menü-Enforcement (Priorität 9999), Direktzugriff-Schutz |
-| `includes/class-settings.php` | Einstellungsseite, Capability-Synchronisierung |
+| `includes/class-admin-menu.php` | Menü-Enforcement (Priorität 9999), Direktzugriff-Schutz, Login-Redirect |
+| `includes/class-settings.php` | Einstellungsseite (3 Tabs), Capability-Synchronisierung |
+| `includes/class-role-manager.php` | Rollen erstellen/löschen, AJAX-Rollenzuweisung |
 | `includes/class-content-filter.php` | `pre_get_posts`-Filter für Admin & REST API |
 | `uninstall.php` | Bereinigung bei Plugin-Löschung |
 | `assets/admin.css` | Styles der Einstellungsseite |
-| `assets/admin.js` | Interaktivität: Suche, Zähler, Capability-Vorschau |
+| `assets/admin.js` | Interaktivität: Suche, Paginierung, Zähler, Capability-Vorschau, AJAX |
 
-**WordPress-Option:** `wp_userrights_permissions`
+**WordPress-Optionen:**
+- `wp_userrights_permissions` — Berechtigungen pro Rolle
+- `wp_userrights_managed_roles` — Liste der plugin-erstellten Rollen
 
 Gespeichertes Format:
 ```php
@@ -138,6 +207,12 @@ Gespeichertes Format:
 
 ## Changelog
 
+### 1.1.0
+- Login-Weiterleitung: Benutzer landen nach Login direkt auf der ersten erlaubten Seite
+- Tab „Benutzer": Live-Suchfeld für Benutzer nach Name/E-Mail
+- Tab „Benutzer": Paginierung (20 Benutzer pro Seite)
+- README vollständig überarbeitet und erweitert
+
 ### 1.0.0
 - Erstveröffentlichung
 - Menü-Zugriffskontrolle pro Rolle
@@ -148,7 +223,10 @@ Gespeichertes Format:
 - Capability-Vorschau in Echtzeit
 - Suchfilter für Menüpunkte
 - Warnung für WordPress-Standardrollen
-- Saubere Deinstallationsroutine
+- Tab „Rollen verwalten": eigene Rollen erstellen und löschen
+- Tab „Benutzer": Rollen per AJAX-Toggle-Schalter zuweisen
+- Abonnenten-Sperre: kein Backend-Zugriff für reine Subscriber
+- Saubere Deinstallationsroutine (inkl. plugin-erstellte Rollen)
 
 ---
 
