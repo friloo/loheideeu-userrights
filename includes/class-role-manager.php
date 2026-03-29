@@ -14,6 +14,7 @@ class WP_UserRights_Role_Manager {
 	public function __construct() {
 		add_action( 'admin_post_wpur_create_role',      array( $this, 'create_role' ) );
 		add_action( 'admin_post_wpur_delete_role',      array( $this, 'delete_role' ) );
+		add_action( 'admin_post_wpur_bulk_assign',      array( $this, 'handle_bulk_assign' ) );
 		add_action( 'wp_ajax_wpur_toggle_user_role',    array( $this, 'ajax_toggle_user_role' ) );
 	}
 
@@ -113,6 +114,58 @@ class WP_UserRights_Role_Manager {
 		wp_safe_redirect( add_query_arg(
 			array( 'page' => 'wp-userrights', 'tab' => 'rollen', 'role_deleted' => '1' ),
 			admin_url( 'admin.php' )
+		) );
+		exit;
+	}
+
+	// -------------------------------------------------------------------------
+	// Bulk-Zuweisung: Rolle mehreren Benutzern gleichzeitig zuweisen/entziehen
+	// -------------------------------------------------------------------------
+
+	public function handle_bulk_assign() {
+		if ( ! current_user_can( 'manage_options' ) ) {
+			wp_die( esc_html__( 'Keine Berechtigung.', 'wp-userrights' ) );
+		}
+
+		if ( ! wp_verify_nonce(
+			isset( $_POST['wpur_bulk_nonce'] ) ? $_POST['wpur_bulk_nonce'] : '',
+			'wpur_bulk_assign'
+		) ) {
+			wp_die( esc_html__( 'Sicherheitsprüfung fehlgeschlagen.', 'wp-userrights' ) );
+		}
+
+		$user_ids    = isset( $_POST['bulk_users'] ) ? array_map( 'absint', (array) $_POST['bulk_users'] ) : array();
+		$role        = sanitize_key( isset( $_POST['bulk_role'] ) ? $_POST['bulk_role'] : '' );
+		$bulk_action = isset( $_POST['bulk_action'] ) ? sanitize_key( $_POST['bulk_action'] ) : '';
+
+		$redirect_base = add_query_arg( array( 'page' => 'wp-userrights', 'tab' => 'benutzer' ), admin_url( 'admin.php' ) );
+
+		if ( empty( $user_ids ) || empty( $role ) || ! in_array( $bulk_action, array( 'assign', 'remove' ), true ) ) {
+			wp_safe_redirect( add_query_arg( 'bulk_error', 'empty', $redirect_base ) );
+			exit;
+		}
+
+		if ( ! in_array( $role, self::get_managed_roles(), true ) ) {
+			wp_die( esc_html__( 'Rolle nicht erlaubt.', 'wp-userrights' ) );
+		}
+
+		$count = 0;
+		foreach ( $user_ids as $user_id ) {
+			$user = get_userdata( $user_id );
+			if ( ! $user || in_array( 'administrator', (array) $user->roles, true ) ) {
+				continue;
+			}
+			if ( 'assign' === $bulk_action ) {
+				$user->add_role( $role );
+			} else {
+				$user->remove_role( $role );
+			}
+			$count++;
+		}
+
+		wp_safe_redirect( add_query_arg(
+			array( 'bulk_done' => $count, 'bulk_action' => $bulk_action ),
+			$redirect_base
 		) );
 		exit;
 	}

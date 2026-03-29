@@ -492,6 +492,18 @@ class WP_UserRights_Settings {
 	private function render_users_tab() {
 		$managed_roles = WP_UserRights_Role_Manager::get_managed_roles();
 		$all_roles     = wp_roles()->roles;
+
+		// Bulk-Aktion: Ergebnis-Hinweis
+		if ( isset( $_GET['bulk_done'] ) ) {
+			$bulk_count  = absint( $_GET['bulk_done'] );
+			$bulk_action = isset( $_GET['bulk_action'] ) ? sanitize_key( $_GET['bulk_action'] ) : 'assign';
+			$bulk_msg    = ( 'assign' === $bulk_action )
+				? sprintf( _n( '%d Benutzer wurde die Rolle zugewiesen.', '%d Benutzern wurde die Rolle zugewiesen.', $bulk_count, 'wp-userrights' ), $bulk_count )
+				: sprintf( _n( 'Rolle wurde %d Benutzer entzogen.', 'Rolle wurde %d Benutzern entzogen.', $bulk_count, 'wp-userrights' ), $bulk_count );
+			echo '<div class="notice notice-success is-dismissible"><p>' . esc_html( $bulk_msg ) . '</p></div>';
+		} elseif ( isset( $_GET['bulk_error'] ) ) {
+			echo '<div class="notice notice-error is-dismissible"><p>' . esc_html__( 'Keine Benutzer oder Rolle ausgewählt.', 'wp-userrights' ) . '</p></div>';
+		}
 		?>
 
 		<?php if ( empty( $managed_roles ) ) : ?>
@@ -576,77 +588,112 @@ class WP_UserRights_Settings {
 				}
 				?>
 			</p>
-			<?php else : ?>
-			<div class="wpur-user-table-wrap">
-				<table class="wp-list-table widefat fixed striped wpur-user-table">
-					<thead>
-						<tr>
-							<th class="col-user"><?php esc_html_e( 'Benutzer', 'wp-userrights' ); ?></th>
-							<th class="col-base-role"><?php esc_html_e( 'Basis-Rolle', 'wp-userrights' ); ?></th>
-							<?php foreach ( $managed_roles as $role_slug ) :
-								if ( ! isset( $all_roles[ $role_slug ] ) ) continue;
-							?>
-							<th class="col-role"><?php echo esc_html( translate_user_role( $all_roles[ $role_slug ]['name'] ) ); ?></th>
-							<?php endforeach; ?>
-							<th class="col-status"><?php esc_html_e( 'Status', 'wp-userrights' ); ?></th>
-						</tr>
-					</thead>
-					<tbody>
-						<?php foreach ( $users as $user ) :
-							$user_roles  = (array) $user->roles;
-							$base_roles  = array_diff( $user_roles, $managed_roles );
-							$base_labels = array();
-							foreach ( $base_roles as $br ) {
-								$base_labels[] = isset( $all_roles[ $br ] ) ? translate_user_role( $all_roles[ $br ]['name'] ) : $br;
-							}
-							$is_subscriber_only = ( $user_roles === array( 'subscriber' ) );
-						?>
-						<tr data-user-id="<?php echo esc_attr( $user->ID ); ?>">
-							<td class="col-user">
-								<div class="wpur-user-info">
-									<?php echo get_avatar( $user->ID, 28, '', '', array( 'class' => 'wpur-avatar' ) ); ?>
-									<div>
-										<strong><?php echo esc_html( $user->display_name ); ?></strong>
-										<br><small class="wpur-email"><?php echo esc_html( $user->user_email ); ?></small>
-									</div>
-								</div>
-							</td>
-							<td class="col-base-role">
-								<?php if ( ! empty( $base_labels ) ) : ?>
-								<span class="wpur-base-role-badge"><?php echo esc_html( implode( ', ', $base_labels ) ); ?></span>
-								<?php if ( $is_subscriber_only ) : ?>
-								<br><small class="wpur-subscriber-hint">
-									<span class="dashicons dashicons-lock"></span>
-									<?php esc_html_e( 'Kein Backend-Zugriff', 'wp-userrights' ); ?>
-								</small>
-								<?php endif; ?>
-								<?php else : ?>
-								<span class="wpur-text-muted"><?php esc_html_e( '(keine)', 'wp-userrights' ); ?></span>
-								<?php endif; ?>
-							</td>
-							<?php foreach ( $managed_roles as $role_slug ) :
-								if ( ! isset( $all_roles[ $role_slug ] ) ) continue;
-								$has_role = in_array( $role_slug, $user_roles, true );
-							?>
-							<td class="col-role">
-								<label class="wpur-toggle-wrap" title="<?php echo esc_attr( translate_user_role( $all_roles[ $role_slug ]['name'] ) ); ?>">
-									<input type="checkbox"
-										class="wpur-role-toggle"
-										data-user-id="<?php echo esc_attr( $user->ID ); ?>"
-										data-role="<?php echo esc_attr( $role_slug ); ?>"
-										<?php checked( $has_role ); ?>>
-									<span class="wpur-toggle-slider"></span>
-								</label>
-							</td>
-							<?php endforeach; ?>
-							<td class="col-status">
-								<span class="wpur-save-status" id="wpur-status-<?php echo esc_attr( $user->ID ); ?>"></span>
-							</td>
-						</tr>
+			<?php else :
+				$col_count = 3 + count( array_filter( $managed_roles, function( $s ) use ( $all_roles ) { return isset( $all_roles[ $s ] ); } ) );
+			?>
+			<form method="post" action="<?php echo esc_url( admin_url( 'admin-post.php' ) ); ?>" id="wpur-bulk-form">
+				<?php wp_nonce_field( 'wpur_bulk_assign', 'wpur_bulk_nonce' ); ?>
+				<input type="hidden" name="action" value="wpur_bulk_assign">
+
+				<!-- Bulk-Aktionsleiste -->
+				<div class="wpur-bulk-bar" id="wpur-bulk-bar">
+					<span class="wpur-bulk-selected-count">
+						<span id="wpur-bulk-count">0</span> <?php esc_html_e( 'ausgewählt', 'wp-userrights' ); ?>
+					</span>
+					<select name="bulk_role" class="wpur-bulk-role-select">
+						<option value=""><?php esc_html_e( '— Rolle wählen —', 'wp-userrights' ); ?></option>
+						<?php foreach ( $managed_roles as $rs ) :
+							if ( ! isset( $all_roles[ $rs ] ) ) continue; ?>
+						<option value="<?php echo esc_attr( $rs ); ?>"><?php echo esc_html( translate_user_role( $all_roles[ $rs ]['name'] ) ); ?></option>
 						<?php endforeach; ?>
-					</tbody>
-				</table>
-			</div>
+					</select>
+					<button type="submit" name="bulk_action" value="assign" class="button button-primary">
+						<span class="dashicons dashicons-plus-alt2"></span> <?php esc_html_e( 'Zuweisen', 'wp-userrights' ); ?>
+					</button>
+					<button type="submit" name="bulk_action" value="remove" class="button wpur-btn-delete">
+						<span class="dashicons dashicons-minus"></span> <?php esc_html_e( 'Entziehen', 'wp-userrights' ); ?>
+					</button>
+				</div>
+
+				<div class="wpur-user-table-wrap">
+					<table class="wp-list-table widefat fixed striped wpur-user-table">
+						<thead>
+							<tr>
+								<th class="col-check">
+									<input type="checkbox" id="wpur-select-all" title="<?php esc_attr_e( 'Alle auswählen', 'wp-userrights' ); ?>">
+								</th>
+								<th class="col-user"><?php esc_html_e( 'Benutzer', 'wp-userrights' ); ?></th>
+								<th class="col-base-role"><?php esc_html_e( 'Basis-Rolle', 'wp-userrights' ); ?></th>
+								<?php foreach ( $managed_roles as $role_slug ) :
+									if ( ! isset( $all_roles[ $role_slug ] ) ) continue;
+								?>
+								<th class="col-role"><?php echo esc_html( translate_user_role( $all_roles[ $role_slug ]['name'] ) ); ?></th>
+								<?php endforeach; ?>
+								<th class="col-status"><?php esc_html_e( 'Status', 'wp-userrights' ); ?></th>
+							</tr>
+						</thead>
+						<tbody>
+							<?php foreach ( $users as $user ) :
+								$user_roles  = (array) $user->roles;
+								$base_roles  = array_diff( $user_roles, $managed_roles );
+								$base_labels = array();
+								foreach ( $base_roles as $br ) {
+									$base_labels[] = isset( $all_roles[ $br ] ) ? translate_user_role( $all_roles[ $br ]['name'] ) : $br;
+								}
+								$is_subscriber_only = ( $user_roles === array( 'subscriber' ) );
+							?>
+							<tr data-user-id="<?php echo esc_attr( $user->ID ); ?>">
+								<td class="col-check">
+									<input type="checkbox" name="bulk_users[]"
+										value="<?php echo esc_attr( $user->ID ); ?>"
+										class="wpur-bulk-checkbox">
+								</td>
+								<td class="col-user">
+									<div class="wpur-user-info">
+										<?php echo get_avatar( $user->ID, 28, '', '', array( 'class' => 'wpur-avatar' ) ); ?>
+										<div>
+											<strong><?php echo esc_html( $user->display_name ); ?></strong>
+											<br><small class="wpur-email"><?php echo esc_html( $user->user_email ); ?></small>
+										</div>
+									</div>
+								</td>
+								<td class="col-base-role">
+									<?php if ( ! empty( $base_labels ) ) : ?>
+									<span class="wpur-base-role-badge"><?php echo esc_html( implode( ', ', $base_labels ) ); ?></span>
+									<?php if ( $is_subscriber_only ) : ?>
+									<br><small class="wpur-subscriber-hint">
+										<span class="dashicons dashicons-lock"></span>
+										<?php esc_html_e( 'Kein Backend-Zugriff', 'wp-userrights' ); ?>
+									</small>
+									<?php endif; ?>
+									<?php else : ?>
+									<span class="wpur-text-muted"><?php esc_html_e( '(keine)', 'wp-userrights' ); ?></span>
+									<?php endif; ?>
+								</td>
+								<?php foreach ( $managed_roles as $role_slug ) :
+									if ( ! isset( $all_roles[ $role_slug ] ) ) continue;
+									$has_role = in_array( $role_slug, $user_roles, true );
+								?>
+								<td class="col-role">
+									<label class="wpur-toggle-wrap" title="<?php echo esc_attr( translate_user_role( $all_roles[ $role_slug ]['name'] ) ); ?>">
+										<input type="checkbox"
+											class="wpur-role-toggle"
+											data-user-id="<?php echo esc_attr( $user->ID ); ?>"
+											data-role="<?php echo esc_attr( $role_slug ); ?>"
+											<?php checked( $has_role ); ?>>
+										<span class="wpur-toggle-slider"></span>
+									</label>
+								</td>
+								<?php endforeach; ?>
+								<td class="col-status">
+									<span class="wpur-save-status" id="wpur-status-<?php echo esc_attr( $user->ID ); ?>"></span>
+								</td>
+							</tr>
+							<?php endforeach; ?>
+						</tbody>
+					</table>
+				</div>
+			</form>
 
 			<?php if ( $total_pages > 1 ) :
 				$base_url = add_query_arg( array( 'page' => 'wp-userrights', 'tab' => 'benutzer' ), admin_url( 'admin.php' ) );

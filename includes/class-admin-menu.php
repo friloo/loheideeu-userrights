@@ -19,6 +19,8 @@ class WP_UserRights_Admin_Menu {
 		add_action( 'admin_notices', array( $this, 'show_access_denied_notice' ) );
 		// Login-Weiterleitung: direkt zur ersten erlaubten Seite
 		add_filter( 'login_redirect', array( $this, 'login_redirect' ), 10, 3 );
+		// Admin-Bar im Frontend für Nicht-Admins ausblenden
+		add_filter( 'show_admin_bar', array( $this, 'hide_admin_bar_for_non_admins' ) );
 	}
 
 	// -------------------------------------------------------------------------
@@ -214,6 +216,22 @@ class WP_UserRights_Admin_Menu {
 	 */
 	private function is_slug_allowed( $slug, array $allowed_slugs ) {
 		return in_array( $slug, $allowed_slugs, true );
+	}
+
+	/**
+	 * Blendet die Admin-Bar im Frontend für alle Nicht-Administratoren aus.
+	 */
+	public function hide_admin_bar_for_non_admins( $show ) {
+		if ( is_admin() ) {
+			return $show;
+		}
+		if ( ! is_user_logged_in() ) {
+			return $show;
+		}
+		if ( current_user_can( 'manage_options' ) ) {
+			return $show;
+		}
+		return false;
 	}
 
 	/**

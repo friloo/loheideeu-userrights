@@ -223,6 +223,44 @@
         });
 
         // --------------------------------------------------------------------
+        // Tab: Benutzer – Bulk-Auswahl (Alle auswählen + Zähler)
+        // --------------------------------------------------------------------
+        function updateBulkCount() {
+            var count = $('.wpur-bulk-checkbox:checked').length;
+            $('#wpur-bulk-count').text(count);
+            // Zeilen hervorheben
+            $('.wpur-bulk-checkbox').each(function () {
+                $(this).closest('tr').toggleClass('wpur-row-selected', $(this).prop('checked'));
+            });
+        }
+
+        // Alle-auswählen Checkbox
+        $(document).on('change', '#wpur-select-all', function () {
+            var checked = $(this).prop('checked');
+            $('.wpur-bulk-checkbox').prop('checked', checked);
+            updateBulkCount();
+        });
+
+        // Einzelne Checkboxen
+        $(document).on('change', '.wpur-bulk-checkbox', function () {
+            var total   = $('.wpur-bulk-checkbox').length;
+            var checked = $('.wpur-bulk-checkbox:checked').length;
+            $('#wpur-select-all').prop('indeterminate', checked > 0 && checked < total)
+                                 .prop('checked', checked === total && total > 0);
+            updateBulkCount();
+        });
+
+        // Bulk-Formular absenden: Validierung
+        $('#wpur-bulk-form').on('submit', function (e) {
+            var count = $('.wpur-bulk-checkbox:checked').length;
+            var role  = $('[name="bulk_role"]').val();
+            if (!count || !role) {
+                e.preventDefault();
+                alert(count ? 'Bitte eine Rolle auswählen.' : 'Bitte mindestens einen Benutzer auswählen.');
+            }
+        });
+
+        // --------------------------------------------------------------------
         // Tab: Benutzer – Suchfeld (Debounce → Auto-Submit)
         // --------------------------------------------------------------------
         var userSearchTimer;
