@@ -1,4 +1,4 @@
-# WP User Rights
+# LOHEIDE.EU - User Rights
 
 **Autor:** Friederich Loheide
 **Website:** [loheide.eu](https://loheide.eu)
