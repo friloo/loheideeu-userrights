@@ -2,10 +2,10 @@
 
 **Autor:** Friederich Loheide
 **Website:** [loheide.eu](https://loheide.eu)
-**Version:** 1.1.0
+**Version:** 1.2.0
 **Erfordert WordPress:** 5.8+
 **Erfordert PHP:** 7.4+
-**Lizenz:** GPL-2.0-or-later
+**Lizenz:** MIT — siehe [LICENSE](LICENSE)
 
 ---
 
@@ -27,7 +27,8 @@ Das Plugin liest alle im WordPress-Backend registrierten Menüpunkte dynamisch a
 - **Gutenberg / REST API** — Die Inhaltsfilter gelten auch für REST-API-Anfragen des Block-Editors
 - **Multi-Rollen-Unterstützung** — Hat ein Benutzer mehrere Rollen, erhält er die Vereinigung aller Rechte
 - **Eigene Rollen erstellen** — Neue Benutzerrollen direkt im Plugin anlegen und löschen
-- **Benutzerverwaltung** — Eigene Rollen per Toggle-Schalter additiv zu Benutzern zuweisen (AJAX, ohne Seitenneuladen)
+- **Benutzerverwaltung** — Eigene Rollen per Chip-UI additiv zu Benutzern zuweisen (AJAX, ohne Seitenneuladen)
+- **Admin-Bar-Filter** — Entfernt Einträge in der Admin-Bar, auf die die Rolle keinen Zugriff hat
 - **Abonnenten-Sperre** — Benutzer mit ausschließlich der Abonnenten-Rolle werden vollständig aus dem Backend ausgesperrt
 - **Suchfunktion** — Menüpunkte und Benutzer in der Einstellungsseite durchsuchbar
 - **Paginierung** — Benutzerliste wird seitenweise angezeigt (20 pro Seite)
@@ -69,6 +70,7 @@ Unterhalb der Menü-Checkboxen können optional Inhaltsfilter konfiguriert werde
 |---|---|
 | **Nur Beiträge in Kategorien** | Kommagetrennte Kategorie-Slugs. Die Rolle sieht nur Beiträge in diesen Kategorien. |
 | **Nur Seiten mit diesen Slugs** | Kommagetrennte Seiten-Slugs. Die Rolle sieht nur diese Seiten in der Seitenliste. |
+| **Mediathek einschränken** | Nur eigene hochgeladene Medien werden angezeigt. |
 
 Leer lassen = keine Einschränkung (sofern der Menüzugriff besteht).
 
@@ -82,7 +84,7 @@ Auf **Einstellungen speichern** klicken. Das Plugin vergibt die benötigten Capa
 Hier können neue Benutzerrollen für WordPress erstellt werden — direkt im Plugin, ohne weiteres Plugin.
 
 #### Neue Rolle erstellen
-1. **Rollenname** eingeben (z. B. „MAV") — der Slug wird automatisch generiert
+1. **Rollenname** eingeben (z. B. „Team 1") — der Slug wird automatisch generiert
 2. Den generierten **Rollen-Slug** prüfen und ggf. anpassen
 3. Auf **Rolle erstellen** klicken
 
@@ -103,7 +105,7 @@ Hier können Benutzern zusätzlich zu ihrer Basis-Rolle eigene plugin-verwaltete
 Die Tabelle zeigt alle Benutzer (außer Administratoren) mit:
 - **Avatar und Name/E-Mail**
 - **Basis-Rolle** — die ursprüngliche WordPress-Rolle des Benutzers
-- **Toggle-Schalter** je plugin-verwalteter Rolle — schaltet die Rolle sofort per AJAX ein oder aus
+- **Plugin-Rollen** — zugewiesene Rollen erscheinen als Chips; über den **+**-Button können weitere Rollen aus einem Dropdown ergänzt werden
 
 Die Zuweisung ist **additiv**: Der Benutzer behält seine Basis-Rolle und erhält zusätzlich die gewählte Rolle. Er erhält damit die Vereinigung aller Rechte beider Rollen.
 
@@ -117,35 +119,42 @@ Bei mehr als 20 Benutzern erscheinen Seitennavigation und eine Anzeige „X–Y 
 
 ## Beispiele
 
-### Rolle „MAV"
-Die Rolle soll Beiträge in der Kategorie „MAV" schreiben und die Unterseite „MAV" unter Seiten bearbeiten können.
+### Rolle „Team 1"
+Die Rolle soll Beiträge in der Kategorie „team1" schreiben und eine bestimmte Seite bearbeiten können.
 
 **Schritt 1 — Rolle erstellen (Tab „Rollen verwalten"):**
-- Rollenname: `MAV`, Slug: `mav` → Rolle erstellen
+- Rollenname: `Team 1`, Slug: `team1` → Rolle erstellen
 
 **Schritt 2 — Berechtigungen setzen (Tab „Berechtigungen"):**
 
 Menü-Checkboxen aktivieren:
 - Beiträge (`edit.php`)
 - Neuen Beitrag erstellen (`post-new.php`)
-- Seiten (`edit.php?post_type=page`) — wird automatisch gesetzt wenn Unterseite gewählt
+- Seiten (`edit.php?post_type=page`)
 
 Inhaltsfilter:
-- Nur Beiträge in Kategorien: `mav`
-- Nur Seiten mit diesen Slugs: `mav`
+- Nur Beiträge in Kategorien: `team1`
+- Nur Seiten mit diesen Slugs: `team1`
 
 **Schritt 3 — Benutzer zuweisen (Tab „Benutzer"):**
-Den gewünschten Benutzer suchen und den Toggle für „MAV" aktivieren.
+Den gewünschten Benutzer suchen und über den **+**-Button die Rolle „Team 1" als Chip hinzufügen.
 
-### Rolle „Künstlerteam"
-Die Rolle soll nur das eigene Plugin „Künstlerteam" und die gleichnamige Seite sehen.
+### Rolle „Team 2"
+Die Rolle soll nur einen bestimmten Plugin-Menüeintrag und eine eigene Seite sehen.
 
 **Menü-Checkboxen aktivieren:**
-- Künstlerteam *(Plugin-Menüeintrag)*
+- Gewünschter Plugin-Menüeintrag
 - Seiten (`edit.php?post_type=page`)
 
 **Inhaltsfilter:**
-- Nur Seiten mit diesen Slugs: `kuenstlerteam`
+- Nur Seiten mit diesen Slugs: `team2`
+
+---
+
+## Bekannte Einschränkungen
+
+### Kategorienfilter im Beitragseditor (⚠ in Bearbeitung)
+Der Kategorienfilter schränkt die **Beitrags-Listenansicht** korrekt ein — die Rolle sieht nur Beiträge der erlaubten Kategorien. **Noch nicht funktionsfähig** ist jedoch die Einschränkung der Kategorie-Auswahl im Beitrags-/Seiten-Editor selbst: Beim Anlegen oder Bearbeiten eines Beitrags werden im Kategorien-Panel des Block-Editors (Gutenberg) noch alle vorhandenen Kategorien angezeigt, nicht nur die erlaubten. Die Auswahl einer nicht erlaubten Kategorie wird zwar nach dem Speichern serverseitig korrigiert, aber die Anzeige im Editor ist noch unvollständig eingeschränkt.
 
 ---
 
@@ -179,13 +188,13 @@ Beim **Löschen** des Plugins (nicht nur Deaktivieren) werden automatisch:
 | Datei | Funktion |
 |---|---|
 | `wp-userrights.php` | Bootstrap, Konstanten, Hook-Registrierung |
-| `includes/class-admin-menu.php` | Menü-Enforcement (Priorität 9999), Direktzugriff-Schutz, Login-Redirect |
-| `includes/class-settings.php` | Einstellungsseite (3 Tabs), Capability-Synchronisierung |
+| `includes/class-admin-menu.php` | Menü-Enforcement (Priorität 9999), Direktzugriff-Schutz, Login-Redirect, Admin-Bar-Filter |
+| `includes/class-settings.php` | Einstellungsseite (3 Tabs), Capability-Synchronisierung, Benutzer-Chip-UI |
 | `includes/class-role-manager.php` | Rollen erstellen/löschen, AJAX-Rollenzuweisung |
-| `includes/class-content-filter.php` | `pre_get_posts`-Filter für Admin & REST API |
+| `includes/class-content-filter.php` | `pre_get_posts`-Filter für Admin & REST API, Mediathek-Filter |
 | `uninstall.php` | Bereinigung bei Plugin-Löschung |
 | `assets/admin.css` | Styles der Einstellungsseite |
-| `assets/admin.js` | Interaktivität: Suche, Paginierung, Zähler, Capability-Vorschau, AJAX |
+| `assets/admin.js` | Interaktivität: Suche, Paginierung, Zähler, Capability-Vorschau, Chip-AJAX |
 
 **WordPress-Optionen:**
 - `wp_userrights_permissions` — Berechtigungen pro Rolle
@@ -194,10 +203,10 @@ Beim **Löschen** des Plugins (nicht nur Deaktivieren) werden automatisch:
 Gespeichertes Format:
 ```php
 [
-    'mav' => [
+    'team1' => [
         'menu_slugs'         => ['edit.php', 'post-new.php', 'edit.php?post_type=page'],
-        'allowed_categories' => ['mav'],
-        'allowed_page_slugs' => ['mav'],
+        'allowed_categories' => ['team1'],
+        'allowed_page_slugs' => ['team1'],
         'managed_caps'       => ['read', 'edit_posts', 'edit_pages'],
     ],
 ]
@@ -206,6 +215,13 @@ Gespeichertes Format:
 ---
 
 ## Changelog
+
+### 1.2.0
+- Einstellungsseite läuft jetzt in voller Breite (kein max-width mehr)
+- Tab „Benutzer": Toggle-Schalter pro Rolle durch Chip-UI ersetzt — skaliert auf beliebig viele Rollen
+- Admin-Bar-Filter: Einträge ohne Zugriffsberechtigung werden ausgeblendet
+- Mediathek-Einschränkung: Rollen sehen nur eigene hochgeladene Dateien
+- Bulk-Rollenzuweisung für mehrere Benutzer gleichzeitig
 
 ### 1.1.0
 - Login-Weiterleitung: Benutzer landen nach Login direkt auf der ersten erlaubten Seite
